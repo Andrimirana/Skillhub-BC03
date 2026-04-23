@@ -21,10 +21,12 @@ storage/framework/views/
 storage/logs/
 bootstrap/cache/
 
-# Coverage / tests
+# Coverage / tests (rapports générés — exclure uniquement les fichiers connus)
 coverage/
 *.xml
 !sonar-project.properties
+!services/auth/pom.xml
+!services/auth/src/**/*.xml
 
 # Éditeurs
 .idea/
