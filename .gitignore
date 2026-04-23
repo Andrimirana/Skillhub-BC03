@@ -44,6 +44,7 @@ composer.phar
 services/auth/target/
 services/auth/logs/
 *.jar
+!services/auth/.mvn/wrapper/maven-wrapper.jar
 *.class
 
 # MongoDB config local
