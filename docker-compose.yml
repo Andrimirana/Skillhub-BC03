@@ -7,13 +7,13 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
       args:
-        VITE_AUTH_URL: http://127.0.0.1:8001/api
-        VITE_CATALOG_URL: http://127.0.0.1:8002/api
-        VITE_INSCRIPTION_URL: http://127.0.0.1:8003/api
+        VITE_AUTH_URL: http://127.0.0.1:8011/api
+        VITE_CATALOG_URL: http://127.0.0.1:8012/api
+        VITE_INSCRIPTION_URL: http://127.0.0.1:8013/api
         VITE_APP_MASTER_KEY: UneCleSuperSecreteDe32Caracteres!
     container_name: skillhub_bc03_frontend
     ports:
-      - "5173:80"
+      - "5183:80"
     depends_on:
       auth_api:
         condition: service_healthy
@@ -39,7 +39,7 @@ services:
       dockerfile: Dockerfile
     container_name: skillhub_bc03_auth
     ports:
-      - "8001:8080"
+      - "8011:8080"
     environment:
       APP_MASTER_KEY: ${APP_MASTER_KEY:-U25lU3VwZXJTZWNyZXRLZXlTa2lsbEh1Yjk5OQ==}
       SPRING_DATASOURCE_URL: jdbc:mysql://db:3306/skillhub_bc03_auth?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
@@ -76,7 +76,7 @@ services:
     volumes:
       - ./services/catalog:/var/www
     ports:
-      - "8002:8000"
+      - "8012:8000"
     command: php artisan serve --host=0.0.0.0 --port=8000 --no-reload
     environment:
       APP_ENV: ${APP_ENV:-local}
@@ -118,7 +118,7 @@ services:
     volumes:
       - ./services/inscription:/var/www
     ports:
-      - "8003:8000"
+      - "8013:8000"
     command: php artisan serve --host=0.0.0.0 --port=8000 --no-reload
     environment:
       APP_ENV: ${APP_ENV:-local}
