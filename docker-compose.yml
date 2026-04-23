@@ -161,7 +161,7 @@ services:
       MYSQL_USER: ${MYSQL_USER:-skillhub_user}
       MYSQL_PASSWORD: ${MYSQL_PASSWORD:-skillhub_pass}
     ports:
-      - "3306:3306"
+      - "3307:3306"
     volumes:
       - db_data:/var/lib/mysql
       - ./docker/mysql/init:/docker-entrypoint-initdb.d
@@ -189,7 +189,7 @@ services:
     environment:
       MONGO_INITDB_DATABASE: ${MONGO_DATABASE:-skillhub_logs}
     ports:
-      - "27017:27017"
+      - "27018:27017"
     volumes:
       - mongo_data:/data/db
     networks:
