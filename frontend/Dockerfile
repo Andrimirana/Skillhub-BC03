@@ -16,6 +16,16 @@ RUN npm install
 # Copier tout le reste du code source
 COPY . .
 
+# Variables d'environnement Vite (injectées au build time via docker-compose)
+ARG VITE_AUTH_URL
+ARG VITE_CATALOG_URL
+ARG VITE_INSCRIPTION_URL
+ARG VITE_APP_MASTER_KEY
+ENV VITE_AUTH_URL=$VITE_AUTH_URL
+ENV VITE_CATALOG_URL=$VITE_CATALOG_URL
+ENV VITE_INSCRIPTION_URL=$VITE_INSCRIPTION_URL
+ENV VITE_APP_MASTER_KEY=$VITE_APP_MASTER_KEY
+
 # Compiler l'application (Vite va générer un dossier 'dist' contenant le site statique)
 RUN npm run build
 

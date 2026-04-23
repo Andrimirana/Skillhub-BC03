@@ -9,7 +9,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
-// Tests des endpoints modules : ajout, modification et suppression par le formateur propriétaire
+// test endpoints modules : ajout, modification et suppression 
 class ModuleControllerTest extends TestCase
 {
     use RefreshDatabase;
@@ -17,6 +17,7 @@ class ModuleControllerTest extends TestCase
     // Le formateur doit posséder la formation pour gérer ses modules
     private array $profilFormateur = ['id' => 1, 'nom' => 'Alice', 'email' => 'alice@test.com', 'role' => 'formateur'];
     private array $profilApprenant = ['id' => 2, 'nom' => 'Bob', 'email' => 'bob@test.com', 'role' => 'apprenant'];
+
 
     protected function setUp(): void
     {
@@ -27,6 +28,7 @@ class ModuleControllerTest extends TestCase
         });
     }
 
+    // Simule la connexion en retournant un profil utilisateur spécifique lors de la validation du token
     private function simulerConnexion(array $profil): void
     {
         Http::fake([
@@ -68,6 +70,7 @@ class ModuleControllerTest extends TestCase
         $reponse->assertForbidden();
     }
 
+
     public function test_add_module_forbidden_for_learner(): void
     {
         $this->simulerConnexion($this->profilApprenant);
@@ -81,6 +84,7 @@ class ModuleControllerTest extends TestCase
         $reponse->assertForbidden();
     }
 
+   /// test modification d' module par le formateur propriétaire 
     public function test_update_own_module(): void
     {
         $this->simulerConnexion($this->profilFormateur);
@@ -93,6 +97,8 @@ class ModuleControllerTest extends TestCase
         $reponse->assertOk()->assertJsonPath('titre', 'Titre modifié');
     }
 
+    
+    // test modification d'un module d'une formation non possédée : 403
     public function test_update_other_module_forbidden(): void
     {
         $this->simulerConnexion($this->profilFormateur);
@@ -108,6 +114,7 @@ class ModuleControllerTest extends TestCase
         $reponse->assertForbidden();
     }
 
+    // test suppression d'un module par le formateur proprietare
     public function test_delete_own_module(): void
     {
         $this->simulerConnexion($this->profilFormateur);
@@ -119,6 +126,8 @@ class ModuleControllerTest extends TestCase
         $this->assertDatabaseMissing('modules', ['id' => $module->id]);
     }
 
+    
+    // test suppression d'un module d'une formation non possédée : 403
     public function test_delete_other_module_forbidden(): void
     {
         $this->simulerConnexion($this->profilFormateur);

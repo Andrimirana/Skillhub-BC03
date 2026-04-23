@@ -1,5 +1,6 @@
 <?php
 
+// tests des endpoints authentification
 namespace Tests\Feature;
 
 use Tests\TestCase;
@@ -11,9 +12,7 @@ class AuthControllerTest extends TestCase
 {
     use RefreshDatabase;
 
-    // ==========================================
-    // CONFIGURATION DE LA SÉCURITÉ POUR LES TESTS
-    // ==========================================
+
 
     protected function setUp(): void
     {
@@ -62,9 +61,9 @@ class AuthControllerTest extends TestCase
         ]);
     }
 
-    // ==========================================
-    // 1. TESTS INSCRIPTION (VALIDATION STRICTE)
-    // ==========================================
+   
+    // 1. TESTS INSCRIPTION
+   
 
     public function test_inscription_reussie_avec_donnees_valides(): void
     {
@@ -108,10 +107,9 @@ class AuthControllerTest extends TestCase
         $response = $this->postJson('/api/register', $donnees, $this->genererEntetesSecurite($donnees));
         $response->assertStatus(422)->assertJsonValidationErrors(['role']);
     }
-
-    // ==========================================
+//
     // 2. TESTS SÉCURITÉ ANTI-REJEU & HMAC (TP3)
-    // ==========================================
+    
 
     public function test_requete_bloquee_si_entetes_securite_manquants(): void
     {
@@ -133,8 +131,10 @@ class AuthControllerTest extends TestCase
         $donnees = ['email' => 'jean@example.com', 'mot_de_passe' => 'Password1!'];
         $entetes = $this->genererEntetesSecurite($donnees, 0, true);
         $response = $this->postJson('/api/login', $donnees, $entetes);
-        $response->assertStatus(403)->assertJson(['message' => 'Signature invalide.']);
+        $response->assertStatus(403)->assertJson(['message' => 'Signature invalide']);
     }
+
+
 
     public function test_requete_bloquee_si_tentative_de_rejeu(): void
     {
@@ -147,9 +147,9 @@ class AuthControllerTest extends TestCase
         $rejeu->assertStatus(403)->assertJson(['message' => 'Tentative de rejeu détectée.']);
     }
 
-    // ==========================================
+    
     // 3. TESTS CONNEXION
-    // ==========================================
+  
 
     public function test_connexion_reussie_avec_identifiants_valides(): void
     {
@@ -174,9 +174,8 @@ class AuthControllerTest extends TestCase
         $response->assertStatus(401);
     }
 
-    // ==========================================
     // 4. TESTS JWT & PROFIL
-    // ==========================================
+    
 
     public function test_acces_profil_reussi_avec_token_valide(): void
     {
@@ -193,6 +192,7 @@ class AuthControllerTest extends TestCase
         $response->assertStatus(401);
     }
 
+    // test deconnexion : le token doit  ne plus fonctionner pour les endpoints protégés
     public function test_deconnexion_reussie_et_blacklist(): void
     {
         $user = User::factory()->create();
@@ -205,9 +205,8 @@ class AuthControllerTest extends TestCase
         $this->assertTrue(Cache::has($cleBlacklist));
     }
 
-    // ==========================================
     // 5. TESTS CHANGEMENT DE MOT DE PASSE (TP5)
-    // ==========================================
+
 
     public function test_changement_mot_de_passe_reussi(): void
     {
@@ -220,7 +219,7 @@ class AuthControllerTest extends TestCase
         ]);
         $response->assertStatus(200);
 
-        // Vérification que le password a bien changé et est au format AES-GCM (iv:ciphertext:tag)
+        // Vérification que le password a bien changé et est au format AES-GCM 
         $user->refresh();
         $this->assertNotEmpty($user->password);
         $this->assertStringContainsString(':', $user->password);
@@ -240,6 +239,7 @@ class AuthControllerTest extends TestCase
         $response->assertStatus(403);
     }
 
+    // test changement de mot de passe avec un nouveau mot de passe identique à l'ancien : doit retourner 422
     public function test_changement_mot_de_passe_echoue_si_nouveau_identique_ancien(): void
     {
         $user = User::factory()->create(['password' => $this->chiffrerPourTest('AncienPass1!')]);
@@ -252,6 +252,8 @@ class AuthControllerTest extends TestCase
         $response->assertStatus(422)->assertJsonValidationErrors(['nouveau_mot_de_passe']);
     }
 
+
+    // test changement de mot de passe avec un nouveau mot de passe trop faible : doit retourner 422
     public function test_changement_mot_de_passe_echoue_si_nouveau_trop_faible(): void
     {
         $user = User::factory()->create(['password' => $this->chiffrerPourTest('AncienPass1!')]);
@@ -264,9 +266,8 @@ class AuthControllerTest extends TestCase
         $response->assertStatus(422)->assertJsonValidationErrors(['nouveau_mot_de_passe']);
     }
 
-    // ==========================================
     // 6. TESTS VALIDATION INTERNE MICROSERVICES
-    // ==========================================
+   
 
     public function test_validation_interne_reussie_avec_token_valide(): void
     {
@@ -288,6 +289,7 @@ class AuthControllerTest extends TestCase
         $response->assertStatus(401)->assertJson(['valid' => false, 'message' => 'Jeton blacklisté.']);
     }
 
+    // test validation interne avec token invalide : retorne 401
     public function test_validation_interne_echoue_sans_token(): void
     {
         $response = $this->postJson('/api/validate-token');

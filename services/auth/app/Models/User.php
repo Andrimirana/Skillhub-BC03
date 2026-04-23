@@ -15,6 +15,8 @@ class User extends Authenticatable
         'email',
         'role',
         'password',
+        'failed_attempts',
+        'lock_until',
     ];
 
     protected $hidden = [
@@ -26,12 +28,13 @@ class User extends Authenticatable
     {
         return [
             'email_verified_at' => 'datetime',
+            'lock_until'        => 'datetime',
+            'failed_attempts'   => 'integer',
         ];
     }
-    
-    public function setPasswordAttribute($value)
+
+    public function setPasswordAttribute(string $value): void
     {
-    // On enregistre la valeur telle qu'elle arrive sans laisser Laravel la hacher
-    $this->attributes['password'] = $value;
+        $this->attributes['password'] = $value;
     }
 }

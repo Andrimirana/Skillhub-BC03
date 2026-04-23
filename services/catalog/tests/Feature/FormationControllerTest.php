@@ -8,12 +8,12 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
-// Tests des endpoints formations : routes publiques et routes protégées formateur
+// tests des endpoints formations : routes publiques et routes protégées formateur
 class FormationControllerTest extends TestCase
 {
     use RefreshDatabase;
 
-    // Profils utilisés pour simuler l'authentification via le middleware
+    // profils utilisés pour simuler l'authentification via le middleware
     private array $profilFormateur = ['id' => 1, 'nom' => 'Alice', 'email' => 'alice@test.com', 'role' => 'formateur'];
     private array $profilApprenant = ['id' => 2, 'nom' => 'Bob', 'email' => 'bob@test.com', 'role' => 'apprenant'];
 
@@ -80,6 +80,7 @@ class FormationControllerTest extends TestCase
         $reponse->assertForbidden();
     }
 
+    // tests de mise à jour et suppression : un formateur ne peut modifier que ses propres formations
     public function test_update_own_formation(): void
     {
         $this->simulerConnexion($this->profilFormateur);
@@ -130,6 +131,7 @@ class FormationControllerTest extends TestCase
         $reponse->assertForbidden();
     }
 
+    // test endpoint my-formations : un formateur voit uniquement ses formations
     public function test_my_formations_returns_only_own(): void
     {
         $this->simulerConnexion($this->profilFormateur);
@@ -147,6 +149,7 @@ class FormationControllerTest extends TestCase
         $reponse->assertForbidden();
     }
 
+    // test accès sans token : tous les endpoints protégés doivent retourner 401
     public function test_no_token_returns_401(): void
     {
         $reponse = $this->postJson('/api/formations', []);
