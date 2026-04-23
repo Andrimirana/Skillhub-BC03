@@ -22,7 +22,7 @@ function Inscription() {
   const navigate = useNavigate();
 
   const expressionEmail = /^[^\s@]+@[^\s@.]+(?:\.[^\s@.]+)+$/;
-  const expressionMotDePasseRobuste = /^(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$/;
+  const expressionMotDePasseRobuste = /^(?=.*[A-Z])(?=.*[a-z])(?=.*\d)(?=.*[^A-Za-z0-9]).{12,}$/;
 
   // Validation locale pour éviter un aller-retour serveur quand les données sont clairement invalides.
   const validerFormulaire = (valeurs) => {
@@ -37,7 +37,7 @@ function Inscription() {
     }
 
     if (!expressionMotDePasseRobuste.test(valeurs.motDePasse)) {
-      erreurs.motDePasse = "Le mot de passe doit contenir 8 caractères minimum, une majuscule, un chiffre et un caractère spécial.";
+      erreurs.motDePasse = "Le mot de passe doit contenir 12 caractères minimum, une majuscule, une minuscule, un chiffre et un caractère spécial.";
     }
 
     if (valeurs.motDePasseConfirmation !== valeurs.motDePasse) {
@@ -51,14 +51,6 @@ function Inscription() {
     return erreurs;
   };
 
-  // Laravel renvoie un objet d'erreurs par champ ; on prend le premier message utile pour l'affichage global.
-  const extrairePremiereErreurValidation = (erreursLaravel) => {
-    const entree = Object.values(erreursLaravel ?? {}).find(
-      (valeur) => Array.isArray(valeur) && valeur.length > 0,
-    );
-
-    return entree?.[0] || "Données invalides.";
-  };
 
   const gererSaisieNom = (evenement) => {
     setNom(evenement.target.value);
@@ -134,28 +126,16 @@ function Inscription() {
       navigate(routeTableauDeBord, { replace: true });
     } catch (e) {
       const statut = e.response?.status;
-      const donneesErreur = e.response?.data;
+      const message = e.response?.data?.message;
 
-      if (statut === 422) {
-        // On mappe les erreurs backend champ par champ pour garder les messages au bon endroit dans le formulaire.
-        const erreursLaravel = donneesErreur?.errors ?? {};
-        setErreursChamps((precedent) => ({
-          ...precedent,
-          nom: erreursLaravel.nom?.[0] ?? precedent.nom,
-          email: erreursLaravel.email?.[0] ?? precedent.email,
-          motDePasse: erreursLaravel.mot_de_passe?.[0] ?? precedent.motDePasse,
-          role: erreursLaravel.role?.[0] ?? precedent.role,
-        }));
-        setErreur(extrairePremiereErreurValidation(erreursLaravel));
-      } else if (statut === 409) {
+      if (statut === 409) {
         setErreursChamps((precedent) => ({
           ...precedent,
           email: "Cette adresse e-mail est déjà utilisée.",
         }));
         setErreur("Cette adresse e-mail est déjà utilisée.");
       } else {
-        const message = donneesErreur?.message || "Inscription impossible.";
-        setErreur(message);
+        setErreur(message || "Inscription impossible. Vérifiez votre connexion.");
       }
     } finally {
       setChargement(false);
@@ -206,7 +186,7 @@ function Inscription() {
               type="password"
               value={motDePasse}
               onChange={gererSaisieMotDePasse}
-              minLength={8}
+              minLength={12}
               aria-invalid={Boolean(erreursChamps.motDePasse)}
               aria-describedby={erreursChamps.motDePasse ? "erreur-mot-de-passe" : undefined}
               required
@@ -222,7 +202,7 @@ function Inscription() {
               type="password"
               value={motDePasseConfirmation}
               onChange={gererSaisieConfirmationMotDePasse}
-              minLength={8}
+              minLength={12}
               aria-invalid={Boolean(erreursChamps.motDePasseConfirmation)}
               aria-describedby={erreursChamps.motDePasseConfirmation ? "erreur-confirmation-mot-de-passe" : undefined}
               required

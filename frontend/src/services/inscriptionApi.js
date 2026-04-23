@@ -7,7 +7,7 @@ import axios from "axios";
 import { recupererJeton, supprimerSession } from "./auth";
 
 const inscriptionApi = axios.create({
-  baseURL: import.meta.env.VITE_INSCRIPTION_URL || "http://127.0.0.1:8003/api",
+  baseURL: import.meta.env.VITE_INSCRIPTION_URL || "http://127.0.0.1:8013/api",
   timeout: 10000,
   headers: {
     "Content-Type": "application/json",

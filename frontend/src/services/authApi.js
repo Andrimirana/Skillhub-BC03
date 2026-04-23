@@ -3,7 +3,7 @@ import CryptoJS from "crypto-js";
 import { recupererJeton, supprimerSession } from "./auth";
 
 const apiAuth = axios.create({
-  baseURL: import.meta.env.VITE_AUTH_URL || "http://127.0.0.1:8001/api",
+  baseURL: import.meta.env.VITE_AUTH_URL || "http://127.0.0.1:8011/api",
   timeout: 10000,
   headers: { "Content-Type": "application/json" },
 });

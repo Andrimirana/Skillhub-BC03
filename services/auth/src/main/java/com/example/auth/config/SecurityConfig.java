@@ -9,16 +9,21 @@ import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.CorsConfigurationSource;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+
+import java.util.List;
 
 /**
- * Configuration Spring Security — mode stateless total.
+ * Configuration Spring Security — mode stateless total avec CORS activé.
  *
  * <p>CSRF désactivé intentionnellement : l'API est stateless (aucune session HTTP,
  * aucun cookie de session). L'authentification passe uniquement par un header
  * {@code Authorization: Bearer <token>}, ce qui rend l'attaque CSRF impossible.</p>
  *
- * <p>En-têtes de sécurité HTTP activés : X-Content-Type-Options, X-Frame-Options,
- * HSTS et Referrer-Policy.</p>
+ * <p>CORS configuré pour autoriser les appels depuis le frontend React
+ * (toute origine acceptée en développement).</p>
  */
 @Configuration
 @EnableWebSecurity
@@ -26,24 +31,18 @@ public class SecurityConfig {
 
     /**
      * Chaîne de filtres de sécurité.
-     *
-     * @param http le builder HttpSecurity Spring
-     * @return la SecurityFilterChain configurée
-     * @throws Exception si la configuration échoue
      */
     @Bean
-    @SuppressWarnings("java:S4502") // CSRF désactivé volontairement — API stateless Bearer token
+    @SuppressWarnings("java:S4502")
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
+            .cors(cors -> cors.configurationSource(corsConfigurationSource()))
             .csrf(AbstractHttpConfigurer::disable)
             .sessionManagement(session ->
                 session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .headers(headers -> headers
                 .contentTypeOptions(contentType -> {})
                 .frameOptions(frame -> frame.deny())
-                .httpStrictTransportSecurity(hsts -> hsts
-                    .includeSubDomains(true)
-                    .maxAgeInSeconds(31536000))
                 .referrerPolicy(referrer ->
                     referrer.policy(
                         org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter
@@ -54,13 +53,25 @@ public class SecurityConfig {
     }
 
     /**
-     * Encodeur BCrypt — utilisé pour les tests de politique de mot de passe.
-     *
-     * @return un BCryptPasswordEncoder
+     * Configuration CORS — autorise le frontend React (toute origine, tous headers).
+     */
+    @Bean
+    public CorsConfigurationSource corsConfigurationSource() {
+        CorsConfiguration config = new CorsConfiguration();
+        config.setAllowedOriginPatterns(List.of("*"));
+        config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
+        config.setAllowedHeaders(List.of("*"));
+        config.setAllowCredentials(false);
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        source.registerCorsMapping("/**", config);
+        return source;
+    }
+
+    /**
+     * Encodeur BCrypt.
      */
     @Bean
     public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();
     }
 }
-

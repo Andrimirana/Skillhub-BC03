@@ -249,11 +249,11 @@ public class AuthService {
         // 2. Vérification ancien mot de passe
         String currentPlain = masterKeyService.decrypt(user.getPasswordEncrypted());
         if (!currentPlain.equals(req.oldPassword())) {
-            log.warn("Changement MDP échoué — ancien mot de passe incorrect : {}", user.getEmail());
+            log.warn("Changement MDP échoué ancien mot de passe incorrect : {}", user.getEmail());
             throw new AuthenticationFailedException("Ancien mot de passe incorrect");
         }
 
-        // 3. Correspondance nouveaux mots de passe
+        // Correspondance nouveaux mots de passe
         if (!req.newPassword().equals(req.confirmPassword())) {
             throw new InvalidInputException(
                 "Le nouveau mot de passe et sa confirmation ne correspondent pas");
