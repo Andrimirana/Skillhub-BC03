@@ -1,30 +1,19 @@
-# Utiliser l'image officielle PHP avec FPM
-FROM php:8.4-cli
-
-# Installer les dépendances système
-RUN apt-get update && apt-get install -y \
-    git \
-    curl \
-    libpng-dev \
-    libonig-dev \
-    libxml2-dev \
-    zip \
-    unzip
-
-# Nettoyer le cache
-RUN apt-get clean && rm -rf /var/lib/apt/lists/*
-
-# Installer les extensions PHP nécessaires pour Laravel
-RUN docker-php-ext-install pdo_mysql mbstring exif pcntl bcmath gd
-
-# Installer Composer
-COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
-
-# Définir le dossier de travail
-WORKDIR /var/www
-
-# Copier le code existant dans le conteneur
-COPY . /var/www
-
-# Donner les droits d'écriture sur les dossiers de Laravel
-RUN mkdir -p /var/www/storage /var/www/bootstrap/cache && chown -R www-data:www-data /var/www/storage /var/www/bootstrap/cache
+﻿# Dockerfile Linux - Hyper-V backend (sans WSL2)
+# Build : docker build -t cdwfs-auth-app .
+# Run   : docker run -p 8080:8080 -e APP_MASTER_KEY="..." cdwfs-auth-app
+# Etape 1 : Build Maven
+FROM eclipse-temurin:17-jdk-alpine AS build
+WORKDIR /app
+COPY mvnw mvnw.cmd pom.xml ./
+COPY .mvn .mvn
+RUN sed -i 's/\r//' mvnw && chmod +x ./mvnw
+RUN ./mvnw dependency:go-offline -B
+COPY src ./src
+RUN ./mvnw package -DskipTests -B
+# Etape 2 : Image finale legere (JRE uniquement)
+FROM eclipse-temurin:17-jre-alpine
+WORKDIR /app
+COPY --from=build /app/target/auth-0.0.1-SNAPSHOT.jar app.jar
+EXPOSE 8080
+ENV SPRING_PROFILES_ACTIVE=prod
+ENTRYPOINT ["java", "-jar", "app.jar"]

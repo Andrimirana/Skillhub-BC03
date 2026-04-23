@@ -35,7 +35,7 @@ services:
   # ---------------------------------
   auth_api:
     build:
-      context: ../Auth_TP1_sonarcloud/auth
+      context: ./services/auth
       dockerfile: Dockerfile
     container_name: skillhub_auth
     ports:
