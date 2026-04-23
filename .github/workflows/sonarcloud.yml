@@ -78,6 +78,7 @@ jobs:
           java-version: "17"
           distribution: "temurin"
           cache: "maven"
+          cache-dependency-path: "services/auth/pom.xml"
 
       - name: Tests du Service Auth (Maven + JaCoCo)
         working-directory: ./services/auth
@@ -177,6 +178,7 @@ jobs:
           java-version: "17"
           distribution: "temurin"
           cache: "maven"
+          cache-dependency-path: "services/auth/pom.xml"
 
       - name: Récupération couverture Auth (JaCoCo)
         uses: actions/download-artifact@v4
