@@ -40,6 +40,16 @@ Thumbs.db
 # PHP Composer
 composer.phar
 
+# Java / Maven (service auth Spring Boot)
+services/auth/target/
+services/auth/logs/
+*.jar
+*.class
+
 # MongoDB config local
 *.env.mongodb
 mongo.md
+
+# Fichiers de travail
+auth.md
+rule.md
