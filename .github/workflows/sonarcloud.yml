@@ -171,12 +171,39 @@ jobs:
           path: services/inscription/coverage.xml
 
   # ==========================================
-  # Job 6: Analyse SonarCloud
+  # Job 6: Tests Limite Inscription (5 formations max)
+  # ==========================================
+  tests-limite:
+    name: Tests Limite Inscription (5 max)
+    runs-on: ubuntu-latest
+    needs: [lint-frontend, lint-php]
+    steps:
+      - name: Récupération du code
+        uses: actions/checkout@v4
+
+      - name: Configuration de PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.3"
+          extensions: mbstring, pdo_sqlite, bcmath, gd, pcov
+          coverage: pcov
+
+      - name: Test de la limite d'inscription (5 formations max)
+        working-directory: ./services/inscription
+        run: |
+          composer install --prefer-dist --no-progress
+          php -r "file_exists('.env') || copy('.env.example', '.env');"
+          php artisan key:generate
+          touch database/database.sqlite
+          DB_CONNECTION=sqlite DB_DATABASE=database/database.sqlite php artisan test --filter=test_learner_cannot_enroll_more_than_5
+
+  # ==========================================
+  # Job 7: Analyse SonarCloud
   # ==========================================
   sonarcloud:
     name: Analyse SonarCloud
     runs-on: ubuntu-latest
-    needs: [tests-auth, tests-catalog, tests-inscription]
+    needs: [tests-auth, tests-catalog, tests-inscription, tests-limite]
     steps:
       - name: Récupération du code
         uses: actions/checkout@v4
@@ -239,12 +266,12 @@ jobs:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
 
   # ==========================================
-  # Job 7: Build images Docker (CI)
+  # Job 8: Build images Docker (CI)
   # ==========================================
   docker-build:
     name: Build des images Docker
     runs-on: ubuntu-latest
-    needs: [tests-auth, tests-catalog, tests-inscription]
+    needs: [tests-auth, tests-catalog, tests-inscription, tests-limite]
     if: github.event_name == 'push'
     steps:
       - name: Récupération du code
@@ -283,7 +310,7 @@ jobs:
           tags: skillhub-inscription:${{ github.sha }}
 
   # ==========================================
-  # Job 8: CD — Push images vers GHCR (main seulement)
+  # Job 9: CD — Push images vers GHCR (main seulement)
   # ==========================================
   docker-push:
     name: Push images vers GitHub Container Registry
