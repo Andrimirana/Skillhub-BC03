@@ -50,7 +50,9 @@ services:
       db:
         condition: service_healthy
     networks:
-      - skillhub_network
+      skillhub_network:
+        aliases:
+          - auth-service
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://localhost:8080/api/health | grep -q UP || exit 1"]
@@ -87,15 +89,17 @@ services:
       DB_USERNAME: ${MYSQL_USER:-skillhub_user}
       DB_PASSWORD: ${MYSQL_PASSWORD:-skillhub_pass}
       JWT_SECRET: ${JWT_SECRET:-secret_dev}
-      AUTH_SERVICE_URL: ${AUTH_SERVICE_URL:-http://auth_api:8000}
+      AUTH_SERVICE_URL: ${AUTH_SERVICE_URL:-http://auth_api:8080}
     depends_on:
       db:
+        condition: service_healthy
+      mongodb:
         condition: service_healthy
     networks:
       - skillhub_network
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "php", "artisan", "--version"]
+      test: ["CMD-SHELL", "php -r \"$$s = @fsockopen('127.0.0.1', 8000, $$e, $$m, 5); exit($$s ? 0 : 1);\""]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -129,16 +133,18 @@ services:
       DB_USERNAME: ${MYSQL_USER:-skillhub_user}
       DB_PASSWORD: ${MYSQL_PASSWORD:-skillhub_pass}
       JWT_SECRET: ${JWT_SECRET:-secret_dev}
-      AUTH_SERVICE_URL: ${AUTH_SERVICE_URL:-http://auth_api:8000}
+      AUTH_SERVICE_URL: ${AUTH_SERVICE_URL:-http://auth_api:8080}
       CATALOG_SERVICE_URL: ${CATALOG_SERVICE_URL:-http://catalog_api:8000}
     depends_on:
       db:
+        condition: service_healthy
+      mongodb:
         condition: service_healthy
     networks:
       - skillhub_network
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "php", "artisan", "--version"]
+      test: ["CMD-SHELL", "php -r \"$$s = @fsockopen('127.0.0.1', 8000, $$e, $$m, 5); exit($$s ? 0 : 1);\""]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -168,7 +174,7 @@ services:
     networks:
       - skillhub_network
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD}"]
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -u root -p$$MYSQL_ROOT_PASSWORD"]
       interval: 10s
       timeout: 5s
       retries: 5
