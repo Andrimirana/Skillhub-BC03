@@ -14,6 +14,7 @@
 10. Contribution
 11. Références & documentation
 12. Pages et routes principales (Frontend)
+13. Utilisation d'intelligence artificielle
 
 ---
 
@@ -274,6 +275,6 @@ Projet réalisé par le groupe BC03 dans le cadre du Bachelor CDWFS, sous la sup
 
 ---
 
-## Licence
+## 13. Utilisation d'intelligence artificelle
+- 
 
-Usage pédagogique interne uniquement.

@@ -7,7 +7,6 @@ import com.example.auth.dto.SkillhubRegisterRequest;
 import com.example.auth.dto.UtilisateurInfo;
 import com.example.auth.entity.AccessToken;
 import com.example.auth.entity.User;
-import com.example.auth.exception.AuthenticationFailedException;
 import com.example.auth.service.AuthService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -47,7 +46,7 @@ public class SkillhubController {
     // ════════════════════════════════════════════════════════════════════
 
     /**
-     * Inscrit un utilisateur et retourne immédiatement un token Bearer.
+     * Inscrit un utilisateur et retourne un JWT Bearer valide.
      * Accepte {nom, email, password, passwordConfirm, role}.
      */
     @PostMapping("/register")
@@ -56,8 +55,11 @@ public class SkillhubController {
         AccessToken token = authService.registerSkillhubUser(
                 req.email(), req.password(), req.passwordConfirm(),
                 req.nom(), req.role());
-        return ResponseEntity.status(201)
-                .body(buildAuthResponse(token));
+        String jwt = authService.generateJwt(token.getUser());
+        long expiresAt = token.getExpiresAt().toEpochSecond(ZoneOffset.UTC);
+        return ResponseEntity.status(201).body(
+            new SkillhubAuthResponse(jwt, "Bearer", expiresAt, toUtilisateurInfo(token.getUser()))
+        );
     }
 
     // ════════════════════════════════════════════════════════════════════
@@ -65,7 +67,7 @@ public class SkillhubController {
     // ════════════════════════════════════════════════════════════════════
 
     /**
-     * Authentifie via HMAC-SHA256.
+     * Authentifie via HMAC-SHA256 et retourne un JWT Bearer valide.
      * Le frontend envoie {email, nonce, timestamp, hmac} où
      * hmac = HMAC_SHA256(clé=mot_de_passe, data="email:nonce:timestamp") en Base64.
      */
@@ -74,7 +76,10 @@ public class SkillhubController {
             @RequestBody LoginRequest req) {
         LoginResponse loginResponse = authService.login(req);
         User user = authService.getUserByToken(loginResponse.accessToken());
-        return ResponseEntity.ok(buildAuthResponse(loginResponse, user));
+        long expiresAt = loginResponse.expiresAt().toEpochSecond(ZoneOffset.UTC);
+        return ResponseEntity.ok(new SkillhubAuthResponse(
+            loginResponse.jwt(), "Bearer", expiresAt, toUtilisateurInfo(user)
+        ));
     }
 
     // ════════════════════════════════════════════════════════════════════
@@ -83,13 +88,21 @@ public class SkillhubController {
 
     /**
      * Retourne les informations de l'utilisateur authentifié.
-     * Alias de GET /api/me adapté au format Skillhub.
+     * Accepte un JWT (frontend Skillhub) ou un UUID (endpoints legacy /api/auth/*).
      */
     @GetMapping("/profil")
     public ResponseEntity<Map<String, Object>> profil(
             @RequestHeader("Authorization") String authHeader) {
-        User user = authService.getUserByToken(extractToken(authHeader));
-        return ResponseEntity.ok(toUserMap(user));
+        String token = extractToken(authHeader);
+        try {
+            if (token != null && token.startsWith("eyJ")) {
+                return ResponseEntity.ok(authService.validateJwtClaims(token));
+            }
+            User user = authService.getUserByToken(token);
+            return ResponseEntity.ok(toUserMap(user));
+        } catch (Exception e) {
+            return ResponseEntity.status(401).body(Map.of("message", "Non autorisé."));
+        }
     }
 
     // ════════════════════════════════════════════════════════════════════
@@ -97,7 +110,8 @@ public class SkillhubController {
     // ════════════════════════════════════════════════════════════════════
 
     /**
-     * Invalide le token Bearer en le supprimant de la base de données.
+     * Déconnecte l'utilisateur. Pour les UUID : suppression en base.
+     * Pour les JWT (stateless) : retourne 200 — le token expire automatiquement.
      */
     @PostMapping("/logout")
     public ResponseEntity<Map<String, String>> logout(
@@ -127,6 +141,7 @@ public class SkillhubController {
 
     /**
      * Valide un token Bearer et retourne les informations de l'utilisateur.
+     * Accepte un JWT signé HS256 (stateless) ou un UUID opaque (lookup DB).
      * Format de réponse attendu par les middlewares PHP de Skillhub :
      * {@code {"valid": true, "user": {"id": 1, "nom": "...", "email": "...", "role": "..."}}}
      */
@@ -138,13 +153,17 @@ public class SkillhubController {
                     .body(Map.of("valid", false, "message", "Jeton manquant."));
         }
 
+        String token = extractToken(authHeader);
         try {
-            User user = authService.getUserByToken(extractToken(authHeader));
-            return ResponseEntity.ok(Map.of(
-                    "valid", true,
-                    "user",  toUserMap(user)
-            ));
-        } catch (AuthenticationFailedException e) {
+            if (token != null && token.startsWith("eyJ")) {
+                // JWT : validation par signature (stateless — pas de requête DB)
+                Map<String, Object> userClaims = authService.validateJwtClaims(token);
+                return ResponseEntity.ok(Map.of("valid", true, "user", userClaims));
+            }
+            // UUID : lookup en base de données (endpoints legacy /api/auth/*)
+            User user = authService.getUserByToken(token);
+            return ResponseEntity.ok(Map.of("valid", true, "user", toUserMap(user)));
+        } catch (Exception e) {
             return ResponseEntity.status(401)
                     .body(Map.of("valid", false, "message", "Jeton invalide ou expiré."));
         }
@@ -169,27 +188,6 @@ public class SkillhubController {
             return authHeader.substring(7);
         }
         return authHeader;
-    }
-
-    private SkillhubAuthResponse buildAuthResponse(AccessToken token) {
-        User user = token.getUser();
-        long expiresAt = token.getExpiresAt().toEpochSecond(ZoneOffset.UTC);
-        return new SkillhubAuthResponse(
-                token.getToken(),
-                "Bearer",
-                expiresAt,
-                toUtilisateurInfo(user)
-        );
-    }
-
-    private SkillhubAuthResponse buildAuthResponse(LoginResponse loginResponse, User user) {
-        long expiresAt = loginResponse.expiresAt().toEpochSecond(ZoneOffset.UTC);
-        return new SkillhubAuthResponse(
-                loginResponse.accessToken(),
-                "Bearer",
-                expiresAt,
-                toUtilisateurInfo(user)
-        );
     }
 
     private UtilisateurInfo toUtilisateurInfo(User user) {

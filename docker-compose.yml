@@ -31,7 +31,7 @@ services:
           cpus: "0.5"
 
   # ---------------------------------
-  # MICROSERVICE 1 : AUTH (Spring Boot — Auth_TP1)
+  # MICROSERVICE 1 : AUTH (Spring Boot)
   # ---------------------------------
   auth_api:
     build:
@@ -42,6 +42,7 @@ services:
       - "8011:8080"
     environment:
       APP_MASTER_KEY: ${APP_MASTER_KEY:-U25lU3VwZXJTZWNyZXRLZXlTa2lsbEh1Yjk5OQ==}
+      JWT_SECRET: ${JWT_SECRET:-dev-secret-key-change-in-production}
       SPRING_DATASOURCE_URL: jdbc:mysql://db:3306/skillhub_auth?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
       SPRING_DATASOURCE_USERNAME: ${MYSQL_USER:-skillhub_user}
       SPRING_DATASOURCE_PASSWORD: ${MYSQL_PASSWORD:-skillhub_pass}

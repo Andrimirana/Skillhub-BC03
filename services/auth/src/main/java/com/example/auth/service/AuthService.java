@@ -216,8 +216,9 @@ public class AuthService {
         nonceRepository.save(authNonce);
 
         AccessToken token = tokenService.generate(user);
+        String jwt = tokenService.generateJwt(user);
         log.info("Connexion réussie : {}", req.email());
-        return new LoginResponse(token.getToken(), token.getExpiresAt());
+        return new LoginResponse(token.getToken(), jwt, token.getExpiresAt());
     }
 
     // ════════════════════════════════════════════════════════════════════
@@ -342,13 +343,42 @@ public class AuthService {
 
     /**
      * Invalide un token Bearer (déconnexion Skillhub).
+     * Pour les tokens UUID : suppression en base. Pour les JWT : opération silencieuse
+     * (les JWTs sont stateless et expirent automatiquement).
      *
-     * @param tokenValue la valeur UUID du token à supprimer
+     * @param tokenValue la valeur du token à invalider (UUID ou JWT)
      */
     @Transactional
     public void logout(String tokenValue) {
-        tokenService.deleteToken(tokenValue);
-        log.info("Token invalidé (logout Skillhub)");
+        try {
+            tokenService.deleteToken(tokenValue);
+        } catch (Exception ignored) {
+            // JWT stateless : le token n'est pas stocké en base — expire naturellement.
+        }
+        log.info("Logout Skillhub effectué");
+    }
+
+    /**
+     * Génère un JWT signé pour un utilisateur (délégation vers TokenService).
+     * Utilisé par les endpoints Skillhub pour retourner un JWT à la place d'un UUID.
+     *
+     * @param user l'utilisateur authentifié
+     * @return le JWT signé HS256
+     */
+    public String generateJwt(User user) {
+        return tokenService.generateJwt(user);
+    }
+
+    /**
+     * Valide un JWT et retourne les claims utilisateur sous forme de Map.
+     * Appelé par {@code POST /api/validate-token} et {@code GET /api/profil}.
+     *
+     * @param jwt le token JWT à valider
+     * @return map {id, nom, email, role} extraite des claims
+     * @throws io.jsonwebtoken.JwtException si le JWT est invalide ou expiré
+     */
+    public java.util.Map<String, Object> validateJwtClaims(String jwt) {
+        return tokenService.validateJwtClaims(jwt);
     }
 
     /**
