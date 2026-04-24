@@ -35,7 +35,7 @@ jobs:
 
       - name: Lint ESLint
         working-directory: ./frontend
-        run: npm run lint -- --max-warnings=0 || true
+        run: npm run lint -- --max-warnings=0
 
   # ==========================================
   # Job 2: Lint PHP Services
@@ -57,10 +57,16 @@ jobs:
         run: echo "Le service Auth est maintenant Spring Boot Java, lint PHP ignoré."
 
       - name: Lint Service Catalog
-        run: find services/catalog/app -name "*.php" | xargs php -l 2>&1 | grep -E "^(Parse|Fatal) error" && exit 1 || true
+        run: |
+          result=$(find services/catalog/app -name "*.php" -print0 | xargs -0 php -l 2>&1)
+          echo "$result"
+          echo "$result" | grep -qE "^(Parse|Fatal) error" && { echo "Erreurs PHP détectées dans catalog"; exit 1; } || exit 0
 
       - name: Lint Service Inscription
-        run: find services/inscription/app -name "*.php" | xargs php -l 2>&1 | grep -E "^(Parse|Fatal) error" && exit 1 || true
+        run: |
+          result=$(find services/inscription/app -name "*.php" -print0 | xargs -0 php -l 2>&1)
+          echo "$result"
+          echo "$result" | grep -qE "^(Parse|Fatal) error" && { echo "Erreurs PHP détectées dans inscription"; exit 1; } || exit 0
 
   # ==========================================
   # Job 3: Tests Service Auth
@@ -171,7 +177,6 @@ jobs:
     name: Analyse SonarCloud
     runs-on: ubuntu-latest
     needs: [tests-auth, tests-catalog, tests-inscription]
-    if: github.event_name == 'push'
     steps:
       - name: Récupération du code
         uses: actions/checkout@v4
@@ -213,7 +218,17 @@ jobs:
         working-directory: ./services/auth
         run: |
           chmod +x mvnw
-          ./mvnw -B compile -q
+          ./mvnw -B compile -q || exit 1
+
+      - name: Vérification binaires Java compilés
+        run: |
+          if [ ! -d services/auth/target/classes ]; then
+            echo "ERREUR : services/auth/target/classes absent — compilation Maven échouée"
+            exit 1
+          fi
+          count=$(find services/auth/target/classes -name "*.class" | wc -l)
+          echo "Binaires Java trouvés : $count fichiers .class"
+          [ "$count" -gt 0 ] || exit 1
 
       - name: Analyse avec SonarCloud
         uses: SonarSource/sonarcloud-github-action@v3
@@ -273,7 +288,7 @@ jobs:
   docker-push:
     name: Push images vers GitHub Container Registry
     runs-on: ubuntu-latest
-    needs: [docker-build, sonarcloud]
+    needs: [docker-build]
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     steps:
       - name: Récupération du code
