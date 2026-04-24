@@ -257,6 +257,11 @@ jobs:
           echo "Binaires Java trouvés : $count fichiers .class"
           [ "$count" -gt 0 ] || exit 1
 
+      - name: Correction chemins couverture PHP (absolus → relatifs)
+        run: |
+          sed -i "s|${GITHUB_WORKSPACE}/||g" services/catalog/coverage.xml    2>/dev/null || true
+          sed -i "s|${GITHUB_WORKSPACE}/||g" services/inscription/coverage.xml 2>/dev/null || true
+
       - name: Analyse avec SonarCloud
         uses: SonarSource/sonarcloud-github-action@v3
         with:
