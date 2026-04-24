@@ -43,6 +43,33 @@ class EnrollmentControllerTest extends TestCase
         ]);
     }
 
+    // test limite d'inscription : un apprenant déjà inscrit à 5 formations reçoit HTTP 400
+    public function test_learner_cannot_enroll_more_than_5(): void
+    {
+        $this->simulerFormationDisponible();
+
+        // Créer 5 inscriptions pour l'apprenant
+        for ($i = 1; $i <= 5; $i++) {
+            Enrollment::factory()->create([
+                'utilisateur_id' => $this->profilApprenant['id'],
+                'formation_id'   => $i,
+            ]);
+        }
+
+        // Tentative d'inscription à une 6e formation
+        $nouvelleFormation = 999;
+        Http::fake([
+            '*/api/validate-token'              => Http::response(['valid' => true, 'user' => $this->profilApprenant], 200),
+            "*/api/formations/{$nouvelleFormation}" => Http::response(['id' => $nouvelleFormation, 'titre' => 'Formation 6'], 200),
+        ]);
+
+        $reponse = $this->withToken('jeton-test')->postJson("/api/formations/{$nouvelleFormation}/inscription");
+        $reponse->assertStatus(400)
+            ->assertJsonFragment([
+                'message' => "Limite d'inscriptions atteinte : un apprenant ne peut être inscrit qu'à 5 formations simultanément."
+            ]);
+    }
+
     // test inscription d'un apprenant à une formation :  201 et créer un enregistrement dans la table enrollments
     public function test_learner_can_enroll(): void
     {
