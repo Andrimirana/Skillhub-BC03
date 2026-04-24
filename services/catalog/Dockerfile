@@ -1,10 +1,9 @@
-FROM php:8.3-cli
+FROM php:8.3-cli-alpine
 
-RUN apt-get update && apt-get install -y \
-    git curl libpng-dev libonig-dev libxml2-dev zip unzip && \
-    apt-get clean && rm -rf /var/lib/apt/lists/*
+RUN apk add --no-cache \
+    git curl libpng-dev oniguruma-dev libxml2-dev zip unzip
 
-RUN docker-php-ext-install pdo_mysql mbstring exif pcntl bcmath gd
+RUN docker-php-ext-install pdo_mysql mbstring exif pcntl bcmath
 
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
@@ -19,14 +18,15 @@ RUN composer install --prefer-dist --no-dev --optimize-autoloader --no-scripts
 # Code source (vendor/ préservé car exclu du contexte par .dockerignore)
 COPY . .
 
-# Découverte des packages, génération de la clé et permissions
-RUN php artisan package:discover --ansi && \
-    php artisan key:generate --force && \
-    mkdir -p storage/logs \
+# Créer les répertoires requis avant les commandes artisan
+RUN mkdir -p storage/logs \
              storage/framework/cache \
              storage/framework/sessions \
              storage/framework/views \
              bootstrap/cache && \
     chmod -R 775 storage bootstrap/cache
+
+RUN php artisan package:discover --ansi && \
+    php artisan key:generate --force
 
 EXPOSE 8000

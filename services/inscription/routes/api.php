@@ -3,6 +3,9 @@
 use App\Http\Controllers\EnrollmentController;
 use Illuminate\Support\Facades\Route;
 
+// Santé du service
+Route::get('/health', fn () => response()->json(['status' => 'UP']));
+
 // Toutes les routes sont privées — inscription requiert un token valide
 Route::middleware('auth.service')->group(function (): void {
     Route::post('/formations/{formationId}/inscription',    [EnrollmentController::class, 'store']);

@@ -25,9 +25,9 @@ services:
       - skillhub_network
     restart: unless-stopped
 
-  # ---------------------------------
+ 
   # MICROSERVICE 1 : AUTH (Spring Boot)
-  # ---------------------------------
+
   auth_api:
     build:
       context: ./services/auth
@@ -94,8 +94,8 @@ services:
       - skillhub_network
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "php -r \"$$s=@fsockopen('127.0.0.1',8000,$$e,$$m,3);exit($$s?0:1);\""]
-      interval: 30s
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:8000/api/health"]
+      interval: 20s
       timeout: 10s
       retries: 5
       start_period: 60s
@@ -140,8 +140,8 @@ services:
       - skillhub_network
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "php -r \"$$s=@fsockopen('127.0.0.1',8000,$$e,$$m,3);exit($$s?0:1);\""]
-      interval: 30s
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:8000/api/health"]
+      interval: 20s
       timeout: 10s
       retries: 5
       start_period: 60s

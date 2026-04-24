@@ -5,6 +5,9 @@ use App\Http\Controllers\FormationController;
 use App\Http\Controllers\ModuleController;
 use Illuminate\Support\Facades\Route;
 
+// Santé du service
+Route::get('/health', fn () => response()->json(['status' => 'UP']));
+
 // Routes publiques
 Route::get('/formations',                   [FormationController::class, 'index']);
 Route::get('/formations/{formation}',       [FormationController::class, 'show']);
