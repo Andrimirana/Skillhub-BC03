@@ -195,7 +195,7 @@ jobs:
           php -r "file_exists('.env') || copy('.env.example', '.env');"
           php artisan key:generate
           touch database/database.sqlite
-          DB_CONNECTION=sqlite DB_DATABASE=database/database.sqlite php artisan test --filter=test_learner_cannot_enroll_more_than_5
+          DB_CONNECTION=sqlite DB_DATABASE=database/database.sqlite php artisan test tests/Feature/EnrollmentControllerTest.php
 
   # ==========================================
   # Job 7: Analyse SonarCloud

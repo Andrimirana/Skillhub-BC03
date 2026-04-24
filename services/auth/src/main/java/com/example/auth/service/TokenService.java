@@ -11,7 +11,10 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.nio.charset.StandardCharsets;
 import java.security.Key;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.time.LocalDateTime;
 import java.util.Date;
 import java.util.UUID;
@@ -67,7 +70,6 @@ public class TokenService {
      * @return le JWT signé
      */
     public String generateJwt(User user) {
-        Key key = Keys.hmacShaKeyFor(jwtSecret.getBytes());
         Date now = new Date();
         Date expiry = new Date(now.getTime() + TOKEN_VALIDITY_MINUTES * 60 * 1000L);
         return Jwts.builder()
@@ -77,7 +79,7 @@ public class TokenService {
                 .claim("userId", user.getId())
                 .claim("nom",  user.getName()  != null ? user.getName()  : user.getEmail())
                 .claim("role", user.getRole()  != null ? user.getRole()  : "apprenant")
-                .signWith(key, SignatureAlgorithm.HS256)
+                .signWith(getSigningKey(), SignatureAlgorithm.HS256)
                 .compact();
     }
 
@@ -90,9 +92,8 @@ public class TokenService {
      * @throws io.jsonwebtoken.JwtException si le token est invalide ou expiré
      */
     public java.util.Map<String, Object> validateJwtClaims(String jwt) {
-        Key key = Keys.hmacShaKeyFor(jwtSecret.getBytes());
         io.jsonwebtoken.Claims claims = Jwts.parserBuilder()
-                .setSigningKey(key)
+                .setSigningKey(getSigningKey())
                 .build()
                 .parseClaimsJws(jwt)
                 .getBody();
@@ -103,6 +104,20 @@ public class TokenService {
         result.put("email", claims.getSubject());
         result.put("role",  claims.getOrDefault("role", "apprenant"));
         return result;
+    }
+
+    /**
+     * Dérive une clé HMAC-SHA256 de 256 bits depuis jwtSecret via SHA-256.
+     * Garantit une clé valide quelle que soit la longueur du secret configuré.
+     */
+    private Key getSigningKey() {
+        try {
+            byte[] hash = MessageDigest.getInstance("SHA-256")
+                    .digest(jwtSecret.getBytes(StandardCharsets.UTF_8));
+            return Keys.hmacShaKeyFor(hash);
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException("SHA-256 non disponible", e);
+        }
     }
 
     /**
