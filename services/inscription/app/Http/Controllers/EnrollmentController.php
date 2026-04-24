@@ -28,6 +28,17 @@ class EnrollmentController extends Controller
             return response()->json(['message' => "Seuls les apprenants peuvent s'inscrire à une formation."], 403);
         }
 
+        // Vérifier la limite d'inscriptions actives (5)
+        $nbInscriptions = Enrollment::query()
+            ->where('utilisateur_id', $utilisateurAuth['id'])
+            ->count();
+
+        if ($nbInscriptions >= 5) {
+            return response()->json([
+                'message' => "Limite d'inscriptions atteinte : un apprenant ne peut être inscrit qu'à 5 formations simultanément."
+            ], 400);
+        }
+
         // La formation est vérifiée auprès du service Catalog avant toute inscription
         $urlCatalog     = config('services.catalog.url');
         $reponseApi     = Http::get("{$urlCatalog}/api/formations/{$idFormation}");
