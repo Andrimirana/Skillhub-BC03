@@ -1,7 +1,5 @@
-﻿# Dockerfile Linux - Hyper-V backend (sans WSL2)
-# Build : docker build -t cdwfs-auth-app .
-# Run   : docker run -p 8080:8080 -e APP_MASTER_KEY="..." cdwfs-auth-app
-# Etape 1 : Build Maven
+﻿
+# Run   : docker run -p 8080:8080 -e APP_MASTER_KEY="..." 
 FROM eclipse-temurin:17-jdk-alpine AS build
 WORKDIR /app
 COPY mvnw mvnw.cmd pom.xml ./
