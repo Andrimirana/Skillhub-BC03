@@ -227,19 +227,19 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: couverture-auth
-          path: services/auth/target/site/jacoco
+          path: .
 
       - name: Récupération couverture Catalog
         uses: actions/download-artifact@v4
         with:
           name: couverture-catalog
-          path: services/catalog
+          path: .
 
       - name: Récupération couverture Inscription
         uses: actions/download-artifact@v4
         with:
           name: couverture-inscription
-          path: services/inscription
+          path: .
 
       - name: Compilation du service Auth (bytecode pour analyse Java)
         working-directory: ./services/auth
@@ -257,10 +257,24 @@ jobs:
           echo "Binaires Java trouvés : $count fichiers .class"
           [ "$count" -gt 0 ] || exit 1
 
-      - name: Correction chemins couverture PHP (absolus → relatifs)
+      - name: Vérification et correction chemins couverture PHP
         run: |
-          sed -i "s|${GITHUB_WORKSPACE}/||g" services/catalog/coverage.xml    2>/dev/null || true
-          sed -i "s|${GITHUB_WORKSPACE}/||g" services/inscription/coverage.xml 2>/dev/null || true
+          echo "=== Fichiers coverage attendus ==="
+          ls -la services/catalog/coverage.xml services/inscription/coverage.xml \
+                 services/auth/target/site/jacoco/jacoco.xml || true
+          echo "=== Correction chemins absolus → relatifs ==="
+          if [ -f services/catalog/coverage.xml ]; then
+            sed -i "s|${GITHUB_WORKSPACE}/||g" services/catalog/coverage.xml
+            echo "catalog: $(wc -l < services/catalog/coverage.xml) lignes, premier chemin: $(grep -m1 'name=' services/catalog/coverage.xml | head -c120)"
+          else
+            echo "AVERTISSEMENT : services/catalog/coverage.xml absent"
+          fi
+          if [ -f services/inscription/coverage.xml ]; then
+            sed -i "s|${GITHUB_WORKSPACE}/||g" services/inscription/coverage.xml
+            echo "inscription: $(wc -l < services/inscription/coverage.xml) lignes, premier chemin: $(grep -m1 'name=' services/inscription/coverage.xml | head -c120)"
+          else
+            echo "AVERTISSEMENT : services/inscription/coverage.xml absent"
+          fi
 
       - name: Analyse avec SonarCloud
         uses: SonarSource/sonarcloud-github-action@v3
