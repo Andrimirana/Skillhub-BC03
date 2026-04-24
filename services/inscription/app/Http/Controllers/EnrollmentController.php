@@ -29,8 +29,8 @@ class EnrollmentController extends Controller
         }
 
         // La formation est vérifiée auprès du service Catalog avant toute inscription
-        $urlCatalog     = config('services.catalog.url');
-        $reponseApi     = Http::get("{$urlCatalog}/api/formations/{$idFormation}");
+        $urlCatalog = rtrim((string) config('services.catalog.url'), '/');
+        $reponseApi = Http::get(sprintf('%s/api/formations/%d', $urlCatalog, $idFormation));
 
         if (! $reponseApi->ok()) {
             return response()->json(['message' => 'Formation introuvable.'], 404);
@@ -92,12 +92,12 @@ class EnrollmentController extends Controller
         }
 
         // Les détails de chaque formation sont récupérés individuellement depuis le service Catalog
-        $urlCatalog   = config('services.catalog.url');
+        $urlCatalog   = rtrim((string) config('services.catalog.url'), '/');
         $idsFormation = $inscriptions->pluck('formation_id')->unique()->values()->all();
 
         $formations = collect();
         foreach ($idsFormation as $id) {
-            $reponseApi = Http::get("{$urlCatalog}/api/formations/{$id}");
+            $reponseApi = Http::get(sprintf('%s/api/formations/%d', $urlCatalog, (int) $id));
             if ($reponseApi->ok()) {
                 $formations->put($id, $reponseApi->json());
             }
