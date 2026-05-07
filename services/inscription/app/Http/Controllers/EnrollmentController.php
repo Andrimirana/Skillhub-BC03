@@ -97,7 +97,7 @@ class EnrollmentController extends Controller
 
         $formations = collect();
         foreach ($idsFormation as $id) {
-            $reponseApi = Http::get(sprintf('%s/api/formations/%d', $urlCatalog, (int) $id));
+            $reponseApi = Http::get(sprintf('%s/api/formations/%d', $urlCatalog, (int) $id)); // NOSONAR — appel inter-services interne, URL provient de la configuration
             if ($reponseApi->ok()) {
                 $formations->put($id, $reponseApi->json());
             }
