@@ -60,12 +60,14 @@ public class MasterKeyService {
      */
     @PostConstruct
     public void init() {
+        // Sans clé maître, l'application refuse de démarrer.
         if (masterKeyRaw == null || masterKeyRaw.isBlank()) {
             throw new IllegalStateException(
                 "APP_MASTER_KEY est obligatoire. " +
                 "Définissez la variable d'environnement APP_MASTER_KEY avant de démarrer l'application.");
         }
         try {
+            // On dérive une clé AES-256 à partir de la clé maître via SHA-256.
             byte[] keyBytes = MessageDigest.getInstance("SHA-256")
                     .digest(masterKeyRaw.getBytes(java.nio.charset.StandardCharsets.UTF_8));
             this.secretKey = new SecretKeySpec(keyBytes, "AES");
@@ -83,14 +85,18 @@ public class MasterKeyService {
      */
     public String encrypt(String plaintext) {
         try {
+            // On génère un IV aléatoire de 12 octets, différent à chaque chiffrement.
             byte[] iv = new byte[GCM_IV_LENGTH];
-            SECURE_RANDOM.nextBytes(iv);   // réutilisation du champ static
+            SECURE_RANDOM.nextBytes(iv);
 
+            // On configure le chiffrement AES-GCM avec la clé et l'IV.
             Cipher cipher = Cipher.getInstance(ALGORITHM);
             cipher.init(Cipher.ENCRYPT_MODE, secretKey, new GCMParameterSpec(GCM_TAG_LENGTH, iv));
+            // On chiffre les données en clair.
             byte[] ciphertext = cipher.doFinal(
                     plaintext.getBytes(java.nio.charset.StandardCharsets.UTF_8));
 
+            // Format de stockage : "v1:base64(iv):base64(ciphertext)".
             return FORMAT_PREFIX + ":"
                     + Base64.getEncoder().encodeToString(iv) + ":"
                     + Base64.getEncoder().encodeToString(ciphertext);
@@ -108,20 +114,26 @@ public class MasterKeyService {
      */
     public String decrypt(String encrypted) {
         try {
+            // On découpe la chaîne stockée en 3 parties.
             String[] parts = encrypted.split(":");
+            // On vérifie le format : préfixe "v1" + 3 parties.
             if (parts.length != 3 || !FORMAT_PREFIX.equals(parts[0])) {
                 throw new IllegalStateException("Format de mot de passe chiffré invalide");
             }
+            // On décode l'IV et le ciphertext depuis le Base64.
             byte[] iv         = Base64.getDecoder().decode(parts[1]);
             byte[] ciphertext = Base64.getDecoder().decode(parts[2]);
 
+            // On configure le déchiffrement AES-GCM avec le même IV.
             Cipher cipher = Cipher.getInstance(ALGORITHM);
             cipher.init(Cipher.DECRYPT_MODE, secretKey, new GCMParameterSpec(GCM_TAG_LENGTH, iv));
+            // On déchiffre. Si le tag GCM est invalide, une exception est levée.
             byte[] plaintext = cipher.doFinal(ciphertext);
             return new String(plaintext, java.nio.charset.StandardCharsets.UTF_8);
         } catch (IllegalStateException e) {
             throw e;
         } catch (GeneralSecurityException | IllegalArgumentException e) {
+            // Erreur générique : on évite de révéler la cause exacte au client.
             throw new IllegalStateException("Erreur de déchiffrement — ciphertext invalide ou corrompu", e);
         }
     }

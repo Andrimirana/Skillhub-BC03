@@ -39,10 +39,14 @@ public class HmacService {
      */
     public String compute(String key, String data) {
         try {
+            // On crée un calculateur HMAC-SHA256.
             Mac mac = Mac.getInstance(HMAC_ALGORITHM);
+            // On initialise le calculateur avec le mot de passe comme clé.
             mac.init(new SecretKeySpec(
                     key.getBytes(StandardCharsets.UTF_8), HMAC_ALGORITHM));
+            // On calcule la signature des données.
             byte[] result = mac.doFinal(data.getBytes(StandardCharsets.UTF_8));
+            // On encode le résultat en Base64 pour le transport HTTP.
             return Base64.getEncoder().encodeToString(result);
         } catch (GeneralSecurityException e) {
             throw new IllegalStateException("Erreur de calcul HMAC", e);
@@ -60,9 +64,11 @@ public class HmacService {
      * @return true si les deux signatures sont identiques
      */
     public boolean compare(String expected, String received) {
+        // Si l'une des deux signatures est nulle, ce n'est pas valide.
         if (expected == null || received == null) {
             return false;
         }
+        // Comparaison en temps constant pour empêcher les attaques temporelles.
         return MessageDigest.isEqual(
                 expected.getBytes(StandardCharsets.UTF_8),
                 received.getBytes(StandardCharsets.UTF_8));

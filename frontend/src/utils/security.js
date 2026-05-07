@@ -6,7 +6,7 @@ export const getSecurityHeaders = (data) => {
     crypto.getRandomValues(bytes);
     const nonce = 'front_' + Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('');
     
-    // ✅ On fixe le body en string UNE SEULE FOIS
+    // On fixe le body en string UNE SEULE FOIS
     const bodyString = JSON.stringify(data);
     const payload = bodyString + nonce + timestamp;
     const secret = import.meta.env.VITE_APP_MASTER_KEY;

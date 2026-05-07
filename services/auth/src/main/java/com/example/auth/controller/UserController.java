@@ -39,8 +39,11 @@ public class UserController {
     @GetMapping("/me")
     public ResponseEntity<Map<String, Object>> getMe(
             @RequestHeader("Authorization") String authHeader) {
+        // On récupère le token Bearer depuis le header.
         String token = extractBearerToken(authHeader);
+        // On retrouve l'utilisateur correspondant à ce token.
         User   user  = authService.getUserByToken(token);
+        // On renvoie les infos publiques de l'utilisateur connecté.
         return ResponseEntity.ok(Map.of(
                 "email",     user.getEmail(),
                 "id",        user.getId(),
@@ -55,6 +58,7 @@ public class UserController {
      * @return la valeur du token Bearer
      */
     private String extractBearerToken(String authHeader) {
+        // On enlève le préfixe "Bearer " pour ne garder que le token.
         if (authHeader != null && authHeader.startsWith("Bearer ")) {
             return authHeader.substring(7);
         }

@@ -31,7 +31,7 @@ import java.util.stream.Collectors;
  *   <li>{@code POST /api/logout}          — Déconnexion (invalidation du token en base)</li>
  *   <li>{@code PUT  /api/change-password} — Changement de mot de passe</li>
  *   <li>{@code POST /api/validate-token}  — Validation interne pour catalog et inscription</li>
- *   <li>{@code GET  /api/health}          — Health check Docker</li>
+ *   <li>{@code GET  /api/health}          — Endpoint de santé du service</li>
  * </ul>
  */
 @RestController
@@ -57,11 +57,15 @@ public class SkillhubController {
     @PostMapping("/register")
     public ResponseEntity<SkillhubAuthResponse> register(
             @RequestBody SkillhubRegisterRequest req) {
+        // On crée le nouvel utilisateur avec son nom et son rôle.
         AccessToken token = authService.registerSkillhubUser(
                 req.email(), req.password(), req.passwordConfirm(),
                 req.nom(), req.role());
+        // On génère un JWT signé pour le client.
         String jwt = authService.generateJwt(token.getUser());
+        // On convertit la date d'expiration en timestamp Unix.
         long expiresAt = token.getExpiresAt().toEpochSecond(ZoneOffset.UTC);
+        // On renvoie un 201 Created avec le token et les infos utilisateur.
         return ResponseEntity.status(201).body(
             new SkillhubAuthResponse(jwt, "Bearer", expiresAt, toUtilisateurInfo(token.getUser()))
         );
@@ -79,9 +83,13 @@ public class SkillhubController {
     @PostMapping("/login")
     public ResponseEntity<SkillhubAuthResponse> login(
             @RequestBody LoginRequest req) {
+        // Le service Auth vérifie le HMAC et émet un token UUID + un JWT.
         LoginResponse loginResponse = authService.login(req);
+        // On retrouve l'utilisateur pour enrichir la réponse.
         User user = authService.getUserByToken(loginResponse.accessToken());
+        // On formate la date d'expiration en epoch Unix.
         long expiresAt = loginResponse.expiresAt().toEpochSecond(ZoneOffset.UTC);
+        // On renvoie le JWT et les infos utilisateur au format Skillhub.
         return ResponseEntity.ok(new SkillhubAuthResponse(
             loginResponse.jwt(), "Bearer", expiresAt, toUtilisateurInfo(user)
         ));
@@ -98,14 +106,18 @@ public class SkillhubController {
     @GetMapping("/profil")
     public ResponseEntity<Map<String, Object>> profil(
             @RequestHeader("Authorization") String authHeader) {
+        // On lit le token Bearer envoyé par le client.
         String token = extractToken(authHeader);
         try {
+            // Si le token commence par "eyJ", c'est un JWT : validation stateless.
             if (token != null && token.startsWith("eyJ")) {
                 return ResponseEntity.ok(authService.validateJwtClaims(token));
             }
+            // Sinon c'est un UUID classique : on lit l'utilisateur en base.
             User user = authService.getUserByToken(token);
             return ResponseEntity.ok(toUserMap(user));
         } catch (Exception e) {
+            // Token invalide ou expiré : on retourne 401.
             return ResponseEntity.status(401).body(Map.of("message", "Non autorisé."));
         }
     }
@@ -121,6 +133,7 @@ public class SkillhubController {
     @PostMapping("/logout")
     public ResponseEntity<Map<String, String>> logout(
             @RequestHeader("Authorization") String authHeader) {
+        // On supprime le token de la base (cas UUID) ou on laisse expirer (cas JWT).
         authService.logout(extractToken(authHeader));
         return ResponseEntity.ok(Map.of("message", "Déconnexion effectuée."));
     }
@@ -212,9 +225,10 @@ public class SkillhubController {
     //  HEALTH CHECK
     // ════════════════════════════════════════════════════════════════════
 
-    /** Endpoint de santé pour le healthcheck Docker. */
+    /** Endpoint de santé du service. */
     @GetMapping("/health")
     public ResponseEntity<Map<String, String>> health() {
+        // Endpoint simple qui répond UP si le service répond.
         return ResponseEntity.ok(Map.of("status", "UP"));
     }
 
@@ -230,6 +244,9 @@ public class SkillhubController {
     }
 
     private UtilisateurInfo toUtilisateurInfo(User user) {
+        // On construit le DTO public à partir de l'entité User.
+        // Si le nom est vide, on utilise l'email à la place.
+        // Si le rôle est vide, on met "apprenant" par défaut.
         return new UtilisateurInfo(
                 user.getId(),
                 user.getName() != null ? user.getName() : user.getEmail(),
@@ -239,6 +256,7 @@ public class SkillhubController {
     }
 
     private Map<String, Object> toUserMap(User user) {
+        // Même logique que toUtilisateurInfo mais sous forme de Map.
         return Map.of(
                 "id",    user.getId(),
                 "nom",   user.getName() != null ? user.getName() : user.getEmail(),

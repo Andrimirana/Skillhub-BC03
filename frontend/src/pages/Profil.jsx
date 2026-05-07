@@ -56,7 +56,7 @@ function Profil() {
         {/* Card changer mot de passe */}
         <section style={{ background: "#fff", borderRadius: 16, border: "1px solid #e7e9f4", boxShadow: "0 4px 20px rgba(98,60,222,0.08)", padding: 28 }}>
           <h2 style={{ margin: "0 0 20px", fontSize: "1.1rem", fontWeight: 700, color: "#1f2233", display: "flex", alignItems: "center", gap: 10 }}>
-            <span style={{ fontSize: "1.3rem" }}>🔒</span> Changer le mot de passe
+            Changer le mot de passe
           </h2>
           <ChangePassword />
         </section>

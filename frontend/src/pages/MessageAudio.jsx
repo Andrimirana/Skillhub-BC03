@@ -246,7 +246,7 @@ export default function MessageAudio() {
                       )}
                       <div style={{ fontSize: 10, marginTop: 4, opacity: 0.7, textAlign: "right" }}>
                         {new Date(msg.date_creation).toLocaleString("fr-FR", { hour: "2-digit", minute: "2-digit" })}
-                        {!estMien && msg.statut_lecture ? " ✓ lu" : ""}
+                        {!estMien && msg.statut_lecture ? " (lu)" : ""}
                       </div>
                       {estMien && (
                         <button

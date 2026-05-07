@@ -59,6 +59,8 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(AuthenticationFailedException.class)
     public ResponseEntity<Map<String, Object>> handleAuthFailed(
             AuthenticationFailedException ex, HttpServletRequest request) {
+        // Si le message indique un compte bloqué, on retourne 429 (trop de tentatives).
+        // Sinon, on retourne 401 (identifiants invalides).
         HttpStatus status = (ex.getMessage() != null && ex.getMessage().contains("bloqué"))
                 ? HttpStatus.TOO_MANY_REQUESTS
                 : HttpStatus.UNAUTHORIZED;
@@ -88,6 +90,7 @@ public class GlobalExceptionHandler {
      */
     private ResponseEntity<Map<String, Object>> buildResponse(
             HttpStatus status, String message, String path) {
+        // On construit un corps JSON standardisé pour toutes les erreurs.
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("timestamp", LocalDateTime.now().toString());
         body.put("status",    status.value());

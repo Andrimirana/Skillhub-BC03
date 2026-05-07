@@ -6,7 +6,7 @@
  */
 
 header('Content-Type: application/json; charset=utf-8');
-header('Access-Control-Allow-Origin: *'); // NOSONAR — service interne, accessible uniquement depuis le réseau Docker
+header('Access-Control-Allow-Origin: *'); // NOSONAR — service interne, accessible uniquement depuis le réseau privé
 header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
 header('Access-Control-Allow-Headers: Content-Type, Authorization');
 
@@ -31,7 +31,7 @@ if ($requestUri === '/api/health' && $requestMethod === 'GET') {
 // ──────────────────────────────────────────────
 function validateToken(string $token): ?array
 {
-    $authUrl = getenv('AUTH_SERVICE_URL') ?: 'http://auth-service:8080'; // NOSONAR — réseau Docker interne, HTTPS non requis
+    $authUrl = getenv('AUTH_SERVICE_URL') ?: 'http://auth-service:8080'; // NOSONAR — réseau interne, HTTPS non requis
     $ch = curl_init("{$authUrl}/api/validate-token");
     curl_setopt_array($ch, [
         CURLOPT_RETURNTRANSFER => true,
@@ -122,7 +122,7 @@ function decryptAES256(string $data): string
 // GET /api/users — liste des utilisateurs (via Auth service)
 // ──────────────────────────────────────────────
 if ($requestUri === '/api/users' && $requestMethod === 'GET') {
-    $authUrl = getenv('AUTH_SERVICE_URL') ?: 'http://auth-service:8080'; // NOSONAR — réseau Docker interne
+    $authUrl = getenv('AUTH_SERVICE_URL') ?: 'http://auth-service:8080'; // NOSONAR — réseau interne
     $ch = curl_init("{$authUrl}/api/users");
     curl_setopt_array($ch, [
         CURLOPT_RETURNTRANSFER => true,

@@ -16,6 +16,7 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 public class AuthApplication {
 
     public static void main(String[] args) {
+        // Démarre le serveur Spring Boot du service Auth.
         SpringApplication.run(AuthApplication.class, args);
     }
 }

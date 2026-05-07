@@ -38,25 +38,31 @@ public class PasswordPolicyValidator {
      * @throws InvalidInputException si le mot de passe est null, vide ou ne respecte pas les règles
      */
     public void validate(String password) {
+        // 1. Le mot de passe doit exister.
         if (password == null || password.isBlank()) {
             throw new InvalidInputException("Le mot de passe ne peut pas être vide");
         }
+        // 2. Il doit faire au moins 12 caractères.
         if (password.length() < MIN_LENGTH) {
             throw new InvalidInputException(
                 "Le mot de passe doit contenir au moins " + MIN_LENGTH + " caractères");
         }
+        // 3. Il doit contenir une majuscule.
         if (!HAS_UPPER.matcher(password).find()) {
             throw new InvalidInputException(
                 "Le mot de passe doit contenir au moins une lettre majuscule");
         }
+        // 4. Il doit contenir une minuscule.
         if (!HAS_LOWER.matcher(password).find()) {
             throw new InvalidInputException(
                 "Le mot de passe doit contenir au moins une lettre minuscule");
         }
+        // 5. Il doit contenir un chiffre.
         if (!HAS_DIGIT.matcher(password).find()) {
             throw new InvalidInputException(
                 "Le mot de passe doit contenir au moins un chiffre");
         }
+        // 6. Il doit contenir un caractère spécial.
         if (!HAS_SPECIAL.matcher(password).find()) {
             throw new InvalidInputException(
                 "Le mot de passe doit contenir au moins un caractrre spécial");
@@ -77,18 +83,22 @@ public class PasswordPolicyValidator {
      * @return {@code "WEAK"}, {@code "MEDIUM"} ou {@code "STRONG"}
      */
     public String evaluateStrength(String password) {
+        // Mot de passe absent ou trop court : faible.
         if (password == null || password.length() < MIN_LENGTH) {
             return "WEAK";
         }
+        // On compte combien de critères sont respectés.
         int score = 0;
         if (HAS_UPPER.matcher(password).find())   score++;
         if (HAS_LOWER.matcher(password).find())   score++;
         if (HAS_DIGIT.matcher(password).find())   score++;
         if (HAS_SPECIAL.matcher(password).find()) score++;
 
+        // Moins de 3 critères : mot de passe faible.
         if (score <= 2) return "WEAK";
+        // Exactement 3 critères : niveau moyen.
         if (score == 3) return "MEDIUM";
-        // score >= 4
+        // 4 critères et 16+ caractères : fort, sinon moyen.
         return password.length() >= 16 ? "STRONG" : "MEDIUM";
     }
 }

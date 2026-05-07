@@ -56,8 +56,11 @@ public class TokenService {
      */
     @Transactional
     public AccessToken generate(User user) {
+        // On génère un identifiant unique (UUID) qui servira de token.
         String tokenValue = UUID.randomUUID().toString();
+        // Le token est valable 15 minutes.
         LocalDateTime expiresAt = LocalDateTime.now().plusMinutes(TOKEN_VALIDITY_MINUTES);
+        // On enregistre le token en base associé à l'utilisateur.
         AccessToken token = new AccessToken(user, tokenValue, expiresAt);
         return accessTokenRepository.save(token);
     }
@@ -70,8 +73,10 @@ public class TokenService {
      * @return le JWT signé
      */
     public String generateJwt(User user) {
+        // Date courante et date d'expiration (now + 15 minutes).
         Date now = new Date();
         Date expiry = new Date(now.getTime() + TOKEN_VALIDITY_MINUTES * 60 * 1000L);
+        // On construit le JWT avec les infos de l'utilisateur dans les claims.
         return Jwts.builder()
                 .setSubject(user.getEmail())
                 .setIssuedAt(now)
@@ -79,6 +84,7 @@ public class TokenService {
                 .claim("userId", user.getId())
                 .claim("nom",  user.getName()  != null ? user.getName()  : user.getEmail())
                 .claim("role", user.getRole()  != null ? user.getRole()  : "apprenant")
+                // On signe le JWT avec l'algorithme HS256.
                 .signWith(getSigningKey(), SignatureAlgorithm.HS256)
                 .compact();
     }
@@ -92,12 +98,14 @@ public class TokenService {
      * @throws io.jsonwebtoken.JwtException si le token est invalide ou expiré
      */
     public java.util.Map<String, Object> validateJwtClaims(String jwt) {
+        // On vérifie la signature et on extrait les claims (le contenu du JWT).
         io.jsonwebtoken.Claims claims = Jwts.parserBuilder()
                 .setSigningKey(getSigningKey())
                 .build()
                 .parseClaimsJws(jwt)
                 .getBody();
 
+        // On construit la map de réponse à renvoyer aux microservices.
         java.util.Map<String, Object> result = new java.util.HashMap<>();
         result.put("id",    claims.get("userId"));
         result.put("nom",   claims.getOrDefault("nom",  claims.getSubject()));
@@ -112,6 +120,8 @@ public class TokenService {
      */
     private Key getSigningKey() {
         try {
+            // On dérive une clé de 256 bits depuis le secret via SHA-256.
+            // Cela garantit que la clé est toujours valide pour HS256.
             byte[] hash = MessageDigest.getInstance("SHA-256")
                     .digest(jwtSecret.getBytes(StandardCharsets.UTF_8));
             return Keys.hmacShaKeyFor(hash);
@@ -129,13 +139,16 @@ public class TokenService {
      */
     @Transactional(readOnly = true)
     public User getUserByToken(String tokenValue) {
+        // On cherche le token en base. S'il n'existe pas, c'est un 401.
         AccessToken token = accessTokenRepository.findByToken(tokenValue)
                 .orElseThrow(() -> new AuthenticationFailedException(
                     "Token invalide ou expiré"));
 
+        // On vérifie que le token n'est pas expiré.
         if (token.getExpiresAt().isBefore(LocalDateTime.now())) {
             throw new AuthenticationFailedException("Token expiré");
         }
+        // Token valide : on retourne l'utilisateur associé.
         return token.getUser();
     }
 
