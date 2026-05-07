@@ -54,8 +54,10 @@ public class SecurityConfig {
 
     /**
      * Configuration CORS — autorise le frontend React (toute origine, tous headers).
+     * Intentionnel en développement : API stateless Bearer token, CORS inoffensif sans credentials.
      */
     @Bean
+    @SuppressWarnings("java:S5122")
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
         config.setAllowedOriginPatterns(List.of("*"));
