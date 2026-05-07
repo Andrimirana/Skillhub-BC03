@@ -97,20 +97,13 @@ class FormationController extends Controller
 
     public function store(Request $requete): JsonResponse
     {
-        \Log::info('=== STORE METHOD CALLED ===');
-        \Log::info('Headers:', $requete->headers->all());
-        \Log::info('Body:', $requete->all());
-        
         $utilisateurAuth = $requete->input('auth_user');
-        \Log::info('Auth user:', ['auth_user' => $utilisateurAuth]);
 
         if (($utilisateurAuth['role'] ?? '') !== 'formateur') {
-            \Log::warning('User is not formateur');
             return response()->json(['message' => 'Seuls les formateurs peuvent créer une formation.'], 403);
         }
 
         $donneesValidees = $requete->validate($this->reglesFormation(true));
-        \Log::info('Validation passed');
 
         $formation = Formation::query()->create([
             'titre'            => $donneesValidees['titre'],
@@ -126,7 +119,6 @@ class FormationController extends Controller
             'formateur_nom'    => $utilisateurAuth['nom'],
             'apprenants_count' => 0,
         ]);
-        \Log::info('Formation created:', ['id' => $formation->id]);
 
         $this->mongoLogger->log('course_created', [
             'course_id'  => $formation->id,

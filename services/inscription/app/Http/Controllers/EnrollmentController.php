@@ -30,7 +30,7 @@ class EnrollmentController extends Controller
 
         // La formation est vérifiée auprès du service Catalog avant toute inscription
         $urlCatalog = rtrim((string) config('services.catalog.url'), '/');
-        $reponseApi = Http::get(sprintf('%s/api/formations/%d', $urlCatalog, $idFormation));
+        $reponseApi = Http::get(sprintf('%s/api/formations/%d', $urlCatalog, $idFormation)); // NOSONAR — appel inter-services interne, URL provient de la configuration
 
         if (! $reponseApi->ok()) {
             return response()->json(['message' => 'Formation introuvable.'], 404);
