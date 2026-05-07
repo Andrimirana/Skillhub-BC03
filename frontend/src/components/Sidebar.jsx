@@ -1,6 +1,6 @@
 import logo from "../assets/logo.svg";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faBook, faSignOutAlt } from "@fortawesome/free-solid-svg-icons";
+import { faBook, faComments, faSignOutAlt } from "@fortawesome/free-solid-svg-icons";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { deconnecter } from "../services/authApi";
 import { recupererUtilisateur, supprimerSession } from "../services/auth";
@@ -50,6 +50,13 @@ function Sidebar() {
           >
             <FontAwesomeIcon icon={faBook} aria-hidden="true" />
             <span>Mes ateliers</span>
+          </Link>
+        </li>
+
+        <li>
+          <Link to="/messages" className={`sidebar-item ${location.pathname === "/messages" ? "active" : ""}`}>
+            <FontAwesomeIcon icon={faComments} aria-hidden="true" />
+            <span>Messagerie</span>
           </Link>
         </li>
       </ul>

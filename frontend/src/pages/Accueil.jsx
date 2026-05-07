@@ -59,19 +59,6 @@ function Accueil() {
   const [formationsMisesEnAvant, setFormationsMisesEnAvant] = useState([]);
   const [erreurFormations, setErreurFormations] = useState(false);
 
-  const [formulaire, setFormulaire] = useState({
-    nom: "",
-    email: "",
-    mdp: "",
-    confirmer: "",
-  });
-  const [erreurs, setErreurs] = useState({
-    nom: "",
-    email: "",
-    mdp: "",
-    confirmer: "",
-  });
-  const [messageEnvoi, setMessageEnvoi] = useState("");
 
   const utilisateur = recupererUtilisateur();
   const lienHeroFormateur = utilisateur?.role === "formateur" ? "/dashboard/formateur" : "/connexion";
@@ -227,67 +214,6 @@ function Accueil() {
     setModalOuverte(false);
   };
 
-  const soumettreModal = (event) => {
-    event.preventDefault();
-    navigate("/inscription");
-  };
-
-  const changerChamp = (event) => {
-    const { name, value } = event.target;
-    setFormulaire((precedent) => ({
-      ...precedent,
-      [name]: value,
-    }));
-    setErreurs((precedent) => ({
-      ...precedent,
-      [name]: "",
-    }));
-  };
-
-  const emailValide = (email) => /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(email);
-
-  const soumettreInscription = (event) => {
-    event.preventDefault();
-
-    const nouvellesErreurs = {
-      nom: "",
-      email: "",
-      mdp: "",
-      confirmer: "",
-    };
-
-    let valide = true;
-
-    if (!formulaire.nom.trim()) {
-      nouvellesErreurs.nom = "Le nom est obligatoire";
-      valide = false;
-    }
-
-    if (!emailValide(formulaire.email)) {
-      nouvellesErreurs.email = "Email invalide";
-      valide = false;
-    }
-
-    if (formulaire.mdp.length < 6) {
-      nouvellesErreurs.mdp = "Mot de passe trop court";
-      valide = false;
-    }
-
-    if (formulaire.confirmer !== formulaire.mdp) {
-      nouvellesErreurs.confirmer = "Les mots de passe ne correspondent pas";
-      valide = false;
-    }
-
-    setErreurs(nouvellesErreurs);
-
-    if (valide) {
-      setMessageEnvoi("Redirection vers l'inscription...");
-      navigate("/inscription");
-      return;
-    }
-
-    setMessageEnvoi("");
-  };
 
   return (
     <>
@@ -488,96 +414,14 @@ function Accueil() {
         </div>
       </section>
 
-      <section className="inscription" aria-labelledby="inscription-title">
-        <form id="inscription" noValidate onSubmit={soumettreInscription}>
-          <h2 id="inscription-title">Inscription</h2>
-          <div className="champ">
-            <label htmlFor="nom-form">Nom</label>
-            <input
-              type="text"
-              id="nom-form"
-              name="nom"
-              required
-              value={formulaire.nom}
-              onChange={changerChamp}
-              className={erreurs.nom ? "erreur-bordure" : ""}
-            />
-            <small className="error" aria-live="assertive">{erreurs.nom}</small>
-          </div>
-          <div className="champ">
-            <label htmlFor="email-form">Email</label>
-            <input
-              type="email"
-              id="email-form"
-              name="email"
-              required
-              value={formulaire.email}
-              onChange={changerChamp}
-              className={erreurs.email ? "erreur-bordure" : ""}
-            />
-            <small className="error" aria-live="assertive">{erreurs.email}</small>
-          </div>
-          <div className="champ">
-            <label htmlFor="mdp-form">Mot de passe</label>
-            <input
-              type="password"
-              id="mdp-form"
-              name="mdp"
-              required
-              value={formulaire.mdp}
-              onChange={changerChamp}
-              className={erreurs.mdp ? "erreur-bordure" : ""}
-            />
-            <small className="error" aria-live="assertive">{erreurs.mdp}</small>
-          </div>
-          <div className="champ">
-            <label htmlFor="confirmer-form">Confirmer mot de passe</label>
-            <input
-              type="password"
-              id="confirmer-form"
-              name="confirmer"
-              required
-              value={formulaire.confirmer}
-              onChange={changerChamp}
-              className={erreurs.confirmer ? "erreur-bordure" : ""}
-            />
-            <small className="error" aria-live="assertive">{erreurs.confirmer}</small>
-          </div>
-          <button type="submit">S'inscrire</button>
-          <p id="envoiReussi" aria-live="polite">{messageEnvoi}</p>
-        </form>
-      </section>
-
       <div id="modalOverlay" className="overlay" aria-hidden="true" hidden={!modalOuverte} onClick={fermerModal} onKeyDown={fermerModal}></div>
-      <div
-        id="modal"
-        className="modal"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="title"
-        hidden={!modalOuverte}
-        ref={modalRef}
-      >
+      <div id="modal" className="modal" role="dialog" aria-modal="true" aria-labelledby="title" hidden={!modalOuverte} ref={modalRef}>
         <h2 id="title">Rejoindre SkillHub</h2>
-        <p className="modal-subtitle">Créez votre compte gratuitement</p>
-        <form onSubmit={soumettreModal}>
-          <div className="champ">
-            <label htmlFor="modal-nom">Nom</label>
-            <input id="modal-nom" type="text" placeholder="Votre nom" required />
-          </div>
-          <div className="champ">
-            <label htmlFor="modal-email">Email</label>
-            <input id="modal-email" type="email" placeholder="votre@email.com" required />
-          </div>
-          <div className="champ">
-            <label htmlFor="modal-mdp">Mot de passe</label>
-            <input id="modal-mdp" type="password" placeholder="••••••••" required />
-          </div>
-          <div className="modal-actions">
-            <button type="submit">Créer le compte</button>
-            <button type="button" id="closeModal" onClick={fermerModal}>Annuler</button>
-          </div>
-        </form>
+        <p className="modal-subtitle">Créez votre compte gratuitement et commencez à apprendre.</p>
+        <div className="modal-actions" style={{ marginTop: '20px', display: 'flex', gap: '10px' }}>
+          <Link to="/inscription" onClick={fermerModal} className="btn btn-apprenant" style={{ textDecoration: 'none', padding: '10px 20px', borderRadius: '8px' }}>Créer mon compte</Link>
+          <button type="button" id="closeModal" onClick={fermerModal} style={{ padding: '10px 20px', borderRadius: '8px', border: '1px solid #ccc', background: 'white', cursor: 'pointer' }}>Annuler</button>
+        </div>
         <p className="modal-login-link">
           Déjà inscrit ?{" "}
           <Link to="/connexion" onClick={fermerModal}>Se connecter</Link>

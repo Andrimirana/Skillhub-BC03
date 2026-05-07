@@ -9,7 +9,6 @@ function DetailFormation() {
   const navigate = useNavigate();
   const [formation, setFormation] = useState(null);
   const [chargement, setChargement] = useState(true);
-  const [erreurChargement, setErreurChargement] = useState("");
   const [inscriptionEnCours, setInscriptionEnCours] = useState(false);
   const [message, setMessage] = useState("");
 
@@ -17,16 +16,8 @@ function DetailFormation() {
     const charger = async () => {
       try {
         setChargement(true);
-        setErreurChargement("");
         const donnees = await detailFormation(id);
         setFormation(donnees);
-      } catch (e) {
-        const statut = e.response?.status;
-        if (statut === 404) {
-          setErreurChargement("Cette formation n'existe pas.");
-        } else {
-          setErreurChargement("Impossible de charger la formation. Veuillez réessayer.");
-        }
       } finally {
         setChargement(false);
       }
@@ -61,10 +52,6 @@ function DetailFormation() {
 
   if (chargement) {
     return null;
-  }
-
-  if (erreurChargement) {
-    return <main className="public-page"><p className="status-banner">{erreurChargement}</p></main>;
   }
 
   if (!formation) {

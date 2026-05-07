@@ -1,5 +1,36 @@
 # SkillHub – Bloc 03 – Cloud, DevOps et Architecture
 
+## 🚀 Démarrage rapide
+
+**Nouveau !** Le projet a été corrigé et est maintenant opérationnel.
+
+```powershell
+# 1. Vérifier que Docker est démarré
+docker version
+
+# 2. Lancer tous les services
+docker-compose up -d
+
+# 3. Vérifier que tout fonctionne
+docker-compose ps
+```
+
+**📚 Documentation complète :**
+
+- **[GUIDE_CORRECTION.md](GUIDE_CORRECTION.md)** - Guide de démarrage et dépannage
+- **[REFERENCE_TECHNIQUE.md](REFERENCE_TECHNIQUE.md)** - Documentation technique complète
+- **[contributing.md](contributing.md)** - Guide de contribution
+
+**✅ Problèmes corrigés :**
+
+- ✅ Frontend manquant (commenté dans docker-compose)
+- ✅ Healthcheck du service Auth (utilise maintenant netcat)
+- ✅ Dépendances MongoDB inutiles (retirées)
+- ✅ Fichier .env créé avec configuration complète
+- ✅ Pipeline CI/CD corrigé (références frontend retirées)
+
+---
+
 ## Sommaire
 
 1. Présentation générale
@@ -25,7 +56,8 @@ SkillHub est une plateforme web collaborative de mise en relation entre formateu
 Ce dépôt regroupe :
 
 - Un frontend React (Vite)
-- Trois microservices Laravel (auth, catalog, inscription)
+- Un microservice Auth en **Spring Boot 3 / Java 17**
+- Deux microservices Laravel (catalog, inscription)
 - Une orchestration Docker
 - Un pipeline CI/CD complet
 
@@ -40,11 +72,26 @@ Objectifs Bloc 03 : industrialisation, conteneurisation, automatisation, quali
 - **React 19** (Vite)
 - Authentification JWT/HMAC, gestion de session, routing protégé, UI moderne
 
-### Backend (microservices Laravel)
+### Backend (microservices)
 
-- **services/auth** : Authentification, gestion des rôles, sécurité HMAC/anti-rejeu, endpoints JWT
-- **services/catalog** : Gestion du catalogue de formations, modules, recherche, CRUD
-- **services/inscription** : Gestion des inscriptions, suivi des apprenants, endpoints dédiés
+#### Auth — Spring Boot 3 / Java 17 (port 8011 → 8080)
+
+- Authentification par **HMAC-SHA256** : le client envoie `{email, nonce, timestamp, hmac}` où `hmac = HMAC_SHA256(clé=motDePasse, données="email:nonce:timestamp")`
+- Génération de **tokens JWT HS256** (expiration 15 min) signés avec une clé dérivée par SHA-256
+- Endpoint `/api/validate-token` appelé par les middlewares Laravel pour vérifier chaque requête
+- Protection anti-rejeu : nonce unique + fenêtre timestamp de 5 minutes
+- Injecté via `APP_MASTER_KEY` et `JWT_SECRET` (jamais en dur)
+
+#### Catalog — Laravel 13 / PHP 8.3 (port 8012 → 8000)
+
+- CRUD formations, modules, recherche filtrée, attribution formateurs
+- Chaque requête protégée vérifie le JWT auprès du service Auth avant de répondre
+
+#### Inscription — Laravel 13 / PHP 8.3 (port 8013 → 8000)
+
+- Gestion des inscriptions apprenants, suivi de progression
+- **Limite métier : 5 inscriptions actives maximum par apprenant** (HTTP 400 si dépassé)
+- Communique avec Auth (validation JWT) et Catalog (vérification formation existante)
 
 ### Base de données
 
@@ -92,9 +139,101 @@ Objectifs Bloc 03 : industrialisation, conteneurisation, automatisation, quali
 
 ### Qualité & tests
 
-- Tests unitaires pour chaque microservice (PHPUnit)
+#### Auth — Spring Boot (JUnit 5 + JaCoCo)
+
+`SkillhubControllerTest.java` — 16 tests couvrant tous les endpoints :
+
+| Test                              | Ce qui est vérifié                    |
+| --------------------------------- | ------------------------------------- |
+| `healthOk`                        | GET /api/health retourne UP           |
+| `registerOk`                      | Inscription valide → JWT retourné     |
+| `registerSansRoleDefautApprenant` | Rôle `apprenant` par défaut si absent |
+| `registerEmailInvalide`           | Email malformé → 400                  |
+| `registerEmailDejaExistant`       | Email dupliqué → 409                  |
+| `loginOk`                         | Login HMAC-SHA256 valide → JWT        |
+| `loginHmacInvalide`               | Mauvais HMAC → 401                    |
+| `profilOk`                        | Accès profil avec token valide        |
+| `profilTokenInvalide`             | Token invalide → 401                  |
+| `logoutOk`                        | Déconnexion réussie                   |
+| `changePasswordOk`                | Changement de mot de passe valide     |
+| `changePasswordAncienIncorrect`   | Ancien mot de passe erroné → 400      |
+| `validateTokenValide`             | JWT valide → `{valid: true}`          |
+| `validateTokenInvalide`           | JWT falsifié → 401                    |
+| `validateTokenSansHeader`         | Pas de header → 401                   |
+| `validateTokenSansPrefixeBearer`  | Header sans `Bearer ` → 401           |
+
+`MasterKeyAbsentTest.java` — 2 tests de démarrage :
+
+- `demarrageSansMasterKeyEchoue` — l'application refuse de démarrer sans `APP_MASTER_KEY`
+- `demarrageSansMasterKeyNullEchoue` — idem si la variable est null
+
+#### Catalog — Laravel (PHPUnit + PCov)
+
+`FormationControllerTest.php` — 12 tests :
+
+| Test                                          | Ce qui est vérifié                       |
+| --------------------------------------------- | ---------------------------------------- |
+| `test_list_formations_public`                 | Liste publique sans token                |
+| `test_show_formation_increments_views`        | Compteur de vues incrémenté              |
+| `test_show_formation_returns_data`            | Données formation retournées             |
+| `test_create_formation_as_trainer`            | Formateur peut créer                     |
+| `test_create_formation_forbidden_for_learner` | Apprenant → 403                          |
+| `test_update_own_formation`                   | Formateur modifie sa formation           |
+| `test_update_other_formation_forbidden`       | Modification d'une autre formation → 403 |
+| `test_delete_own_formation`                   | Formateur supprime sa formation          |
+| `test_delete_other_formation_forbidden`       | Suppression d'une autre → 403            |
+| `test_my_formations_returns_only_own`         | Filtre par formateur connecté            |
+| `test_my_formations_forbidden_for_learner`    | Apprenant → 403                          |
+| `test_no_token_returns_401`                   | Sans token → 401                         |
+
+`ModuleControllerTest.php` — 8 tests (CRUD modules, contrôles de propriété et de rôle)
+
+`MongoActivityLoggerTest.php` — 2 tests (logs MongoDB : URI vide, exception sur URI invalide)
+
+#### Inscription — Laravel (PHPUnit + PCov)
+
+`EnrollmentControllerTest.php` — 10 tests :
+
+| Test                                       | Ce qui est vérifié                   |
+| ------------------------------------------ | ------------------------------------ |
+| `test_learner_can_enroll`                  | Apprenant s'inscrit à une formation  |
+| `test_duplicate_enrollment_returns_same`   | Double inscription → même résultat   |
+| `test_trainer_cannot_enroll`               | Formateur → 403                      |
+| `test_enroll_not_found_returns_404`        | Formation inexistante → 404          |
+| `test_learner_can_unenroll`                | Désinscription réussie               |
+| `test_trainer_cannot_unenroll`             | Formateur ne peut pas se désinscrire |
+| `test_learner_sees_enrollments`            | Apprenant voit ses inscriptions      |
+| `test_learner_no_enrollment_returns_empty` | Pas d'inscription → liste vide       |
+| `test_trainer_cannot_view_enrollments`     | Formateur → 403                      |
+| `test_no_token_returns_401`                | Sans token → 401                     |
+
+`MongoActivityLoggerTest.php` — 2 tests (identiques au Catalog)
+
+#### Règle métier — Limite 5 inscriptions
+
+Un test dédié (`tests-limite` dans le pipeline CI) vérifie qu'un apprenant déjà inscrit à 5 formations reçoit **HTTP 400** avec un message explicite à la 6ème tentative.
+
+#### Commandes locales
+
+```sh
+# Auth (Spring Boot)
+cd services/auth && ./mvnw verify
+
+# Catalog (SQLite)
+cd services/catalog
+composer install && cp .env.example .env && php artisan key:generate
+touch database/database.sqlite
+DB_CONNECTION=sqlite DB_DATABASE=database/database.sqlite php artisan test --coverage-clover coverage.xml
+
+# Inscription (SQLite)
+cd services/inscription
+composer install && cp .env.example .env && php artisan key:generate
+touch database/database.sqlite
+DB_CONNECTION=sqlite DB_DATABASE=database/database.sqlite php artisan test --coverage-clover coverage.xml
+```
+
 - Linting JS/PHP, ESLint côté frontend
-- Analyse SonarCloud sur chaque PR
+- Analyse SonarCloud + Quality Gate bloquante à chaque push
 
 ---
 
@@ -102,11 +241,10 @@ Objectifs Bloc 03 : industrialisation, conteneurisation, automatisation, quali
 
 ```
 /frontend                # Application React.js (Vite)
-/services/auth           # Microservice Authentification (Laravel)
+/services/auth           # Microservice Authentification (Spring Boot / Java 17)
 /services/catalog        # Microservice Catalogue (Laravel)
 /services/inscription    # Microservice Inscriptions (Laravel)
 /docker-compose.yml      # Orchestration multi-conteneurs
-/DOCUMENTATION_TECHNIQUE.md # Doc technique détaillée
 /contributing.md        # Guide de contribution
 /sonar-project.properties# Configurtion SonarCloud
 ```
@@ -127,21 +265,21 @@ Chaque microservice contient :
 ### Clonage & lancement
 
 ```sh
-git clone https://github.com/Andrimirana/skillhub-groupe-BC03.git
-cd skillhub-groupe-BC03
+- cloner le projet : it clone http....
+- entrer dans le projet : cd Skillhub-copie
 docker compose up -d
 ```
 
-Le frontend sera accessible sur le port 5173, les microservices sur 8001 (auth), 8002 (catalog), 8003 (inscription).
+Le frontend sera accessible sur le port **5183**, les microservices sur **8011** (Auth Spring Boot), **8012** (Catalog), **8013** (Inscription).
 
 ### Initialisation des bases de données
 
 Les migrations sont lancées automatiquement au démarrage. Pour reseeder :
 
 ```sh
-docker compose exec auth_api php artisan migrate:fresh --seed
 docker compose exec catalog_api php artisan migrate:fresh --seed
 docker compose exec inscription_api php artisan migrate:fresh --seed
+# Auth (Spring Boot) : la base est gérée par JPA/Hibernate (ddl-auto=update)
 ```
 
 ### Lancer le frontend en mode dev
@@ -269,12 +407,10 @@ docker compose logs auth_api
 
 ---
 
-## Auteurs & Encadrement
-
-Projet réalisé par le groupe BC03 dans le cadre du Bachelor CDWFS, sous la supervision de l’équipe pédagogique.
-
----
-
 ## 13. Utilisation d'intelligence artificelle
-- 
 
+- ChatGPT: Comment adapter un middleware authentificatnio laravel afin d'appeler une ath avec spring boot?
+- ChatGPT: Comment s'assurer retourne JWT valide?
+- ChatGPT: Commentorchestrer 2 services laravel (plusieurs services) et spring boot
+- Chatgpt: C quoi registry stockes
+- CharGPT: Erreur issues dans quality gate

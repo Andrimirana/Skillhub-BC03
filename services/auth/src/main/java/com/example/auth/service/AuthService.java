@@ -244,8 +244,20 @@ public class AuthService {
      */
     @Transactional
     public void changePassword(String tokenValue, ChangePasswordRequest req) {
-        // 1. Validation token
-        User user = tokenService.getUserByToken(tokenValue);
+        // 1. Validation token — JWT (stateless) ou opaque UUID (DB lookup)
+        User user;
+        if (tokenValue != null && tokenValue.startsWith("eyJ")) {
+            try {
+                java.util.Map<String, Object> claims = tokenService.validateJwtClaims(tokenValue);
+                String email = (String) claims.get("email");
+                user = userRepository.findByEmail(email)
+                        .orElseThrow(() -> new AuthenticationFailedException("Utilisateur introuvable"));
+            } catch (io.jsonwebtoken.JwtException e) {
+                throw new AuthenticationFailedException("Token invalide ou expiré");
+            }
+        } else {
+            user = tokenService.getUserByToken(tokenValue);
+        }
 
         // 2. Vérification ancien mot de passe
         String currentPlain = masterKeyService.decrypt(user.getPasswordEncrypted());

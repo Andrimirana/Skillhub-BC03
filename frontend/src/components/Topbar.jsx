@@ -62,7 +62,7 @@ function Topbar() {
       </nav>
 
       <div className="topbar-actions">
-        <span className="topbar-username">{nomUtilisateur}</span>
+        <Link to="/profil" className="topbar-username" title="Mon profil">{nomUtilisateur}</Link>
         {afficherBoutonRetour && (
           <button type="button" className="back_btn" onClick={gererRetour}>
             <FontAwesomeIcon icon={faArrowLeft} aria-hidden="true" />

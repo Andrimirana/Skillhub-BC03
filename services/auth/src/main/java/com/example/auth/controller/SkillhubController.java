@@ -7,12 +7,15 @@ import com.example.auth.dto.SkillhubRegisterRequest;
 import com.example.auth.dto.UtilisateurInfo;
 import com.example.auth.entity.AccessToken;
 import com.example.auth.entity.User;
+import com.example.auth.repository.UserRepository;
 import com.example.auth.service.AuthService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.ZoneOffset;
+import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
  * Contrôleur REST exposant les endpoints compatibles avec le frontend Skillhub.
@@ -36,9 +39,11 @@ import java.util.Map;
 public class SkillhubController {
 
     private final AuthService authService;
+    private final UserRepository userRepository;
 
-    public SkillhubController(AuthService authService) {
+    public SkillhubController(AuthService authService, UserRepository userRepository) {
         this.authService = authService;
+        this.userRepository = userRepository;
     }
 
     // ════════════════════════════════════════════════════════════════════
@@ -167,6 +172,40 @@ public class SkillhubController {
             return ResponseEntity.status(401)
                     .body(Map.of("valid", false, "message", "Jeton invalide ou expiré."));
         }
+    }
+
+    // ════════════════════════════════════════════════════════════════════
+    //  LISTE DES UTILISATEURS (pour le service audio)
+    // ════════════════════════════════════════════════════════════════════
+
+    /**
+     * Retourne la liste de tous les utilisateurs (id, nom, email).
+     * Utilisé par le service audio pour la sélection de destinataires.
+     * Nécessite un token valide.
+     */
+    @GetMapping("/users")
+    public ResponseEntity<?> listUsers(
+            @RequestHeader("Authorization") String authHeader) {
+        String token = extractToken(authHeader);
+        try {
+            if (token != null && token.startsWith("eyJ")) {
+                authService.validateJwtClaims(token);
+            } else {
+                authService.getUserByToken(token);
+            }
+        } catch (Exception e) {
+            return ResponseEntity.status(401).body(Map.of("message", "Non autorisé."));
+        }
+
+        List<Map<String, Object>> utilisateurs = userRepository.findAll().stream()
+                .map(u -> Map.<String, Object>of(
+                        "id",    u.getId(),
+                        "nom",   u.getName() != null ? u.getName() : u.getEmail(),
+                        "email", u.getEmail()
+                ))
+                .collect(Collectors.toList());
+
+        return ResponseEntity.ok(Map.of("utilisateurs", utilisateurs));
     }
 
     // ════════════════════════════════════════════════════════════════════

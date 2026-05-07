@@ -3,18 +3,24 @@
 use App\Http\Controllers\ActivityLogController;
 use App\Http\Controllers\FormationController;
 use App\Http\Controllers\ModuleController;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
 // Santé du service
 Route::get('/health', fn () => response()->json(['status' => 'UP']));
 
+Route::post('/test-post', function (Request $request) {
+    \Log::info('TEST-POST APPELÉ!', ['body' => $request->all()]);
+    return response()->json(['success' => true, 'message' => 'POST fonctionne!', 'data' => $request->all()]);
+});
+
 // Routes publiques
 Route::get('/formations',                   [FormationController::class, 'index']);
 Route::get('/formations/{formation}',       [FormationController::class, 'show']);
-Route::get('/formations/{formation}/modules', [ModuleController::class, 'index']);
+Route::get('/formations/{format363ion}/modules', [ModuleController::class, 'index']);
 Route::get('/formations/{formationId}/logs', [ActivityLogController::class, 'getByFormation']);
 
-// Routes privées — token validé via le service Auth
+// Routes privées  token validé via le service Auth
 Route::middleware('auth.service')->group(function (): void {
     Route::get('/my-formations',               [FormationController::class, 'myFormations']);
     Route::post('/formations',                 [FormationController::class, 'store']);

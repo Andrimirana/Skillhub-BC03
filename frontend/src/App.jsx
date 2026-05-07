@@ -11,6 +11,8 @@ import Accueil from "./pages/Accueil";
 import Formations from "./pages/Formations";
 import Connexion from "./pages/Connexion";
 import Inscription from "./pages/Inscription";
+import MessageAudio from "./pages/MessageAudio";
+import Profil from "./pages/Profil";
 import RouteProtegee from "./components/RouteProtegee";
 import { verifierSession } from "./services/session";
 
@@ -108,6 +110,8 @@ export default function App() {
 
         <Route element={<RouteProtegee />}>
           <Route path="/mes-ateliers" element={<Ateliers />} />
+          <Route path="/messages" element={<MessageAudio />} />
+          <Route path="/profil" element={<Profil />} />
         </Route>
 
         <Route path="/dashboard" element={<RedirectionAccueil />} />

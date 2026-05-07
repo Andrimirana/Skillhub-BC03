@@ -1,6 +1,6 @@
 /*
 | Projet: SkillHub
-| Rôle du fichier: Client HTTP vers le service Catalog (port 8002)
+| Rôle du fichier: Client HTTP vers le service Catalog (port 8012)
 */
 
 import axios from "axios";
@@ -8,7 +8,6 @@ import { recupererJeton, supprimerSession } from "./auth";
 
 const catalogApi = axios.create({
   baseURL: import.meta.env.VITE_CATALOG_URL || "http://127.0.0.1:8012/api",
-  timeout: 10000,
   headers: {
     "Content-Type": "application/json",
   },
