@@ -32,8 +32,8 @@ class FormationController extends Controller
 
         if ($recherche !== '') {
             $requeteDB->where(function ($q) use ($recherche): void {
-                $q->where('titre', 'like', "%{$recherche}%")
-                  ->orWhere('description', 'like', "%{$recherche}%");
+                $q->where('titre', 'like', "%{$recherche}%") // NOSONAR php:S2077 — Eloquent paramètre la valeur, pas d'injection SQL
+                  ->orWhere('description', 'like', "%{$recherche}%"); // NOSONAR php:S2077
             });
         }
 
