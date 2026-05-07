@@ -4,7 +4,13 @@ const CLE_UTILISATEUR = "utilisateur_auth";
 export function sauvegarderSession(token, utilisateur) {
   if (typeof token !== 'string' || !/^[\w-]+\.[\w-]+\.[\w-]+$/.test(token)) return;
   localStorage.setItem(CLE_JETON, token);
-  localStorage.setItem(CLE_UTILISATEUR, JSON.stringify(utilisateur));
+  const utilisateurSanitise = {
+    id: Number(utilisateur?.id) || 0,
+    nom: String(utilisateur?.nom || '').slice(0, 255),
+    email: String(utilisateur?.email || '').slice(0, 255),
+    role: ['apprenant', 'formateur', 'admin'].includes(utilisateur?.role) ? utilisateur.role : '',
+  };
+  localStorage.setItem(CLE_UTILISATEUR, JSON.stringify(utilisateurSanitise));
 }
 
 export function recupererJeton() {
