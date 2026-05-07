@@ -12,42 +12,41 @@ import java.util.Base64;
 /**
  * Service de calcul et de vérification des signatures HMAC-SHA256.
  *
- * <p>Ce service est le cœur cryptographique du protocole d'authentification TP3+.
- * Il est responsable de deux opérations :</p>
+ * <p>Ce service est le cœur cryptographique du protocole d'authentification.
+ * Il sert à deux choses :</p>
  * <ol>
- *   <li>Calculer {@code HMAC_SHA256(key=password, data=email:nonce:timestamp)}</li>
- *   <li>Comparer deux signatures en <b>temps constant</b> pour prévenir les
- *       attaques temporelles (timing attacks)</li>
+ *   <li>Calculer {@code HMAC_SHA256(clé=motDePasse, données=email:nonce:timestamp)}</li>
+ *   <li>Comparer deux signatures en <b>temps constant</b> pour empêcher
+ *       les attaques temporelles (timing attacks)</li>
  * </ol>
  *
  * <p>La comparaison en temps constant via {@link MessageDigest#isEqual(byte[], byte[])}
- * est essentielle : avec {@link String#equals}, un attaquant pourrait mesurer le temps
- * de réponse pour deviner la signature correcte bit par bit.</p>
+ * est essentielle : avec {@link String#equals}, un attaquant pourrait deviner la
+ * signature bit par bit en mesurant le temps de réponse.</p>
  */
 @Service
 public class HmacService {
 
-    private static final String HMAC_ALGORITHM = "HmacSHA256";
+    private static final String ALGORITHME_HMAC = "HmacSHA256";
 
     /**
      * Calcule la signature HMAC-SHA256 d'un message.
      *
-     * @param key  la clé secrète (mot de passe en clair de l'utilisateur)
-     * @param data les données à signer ({@code email:nonce:timestamp})
+     * @param cle      la clé secrète (le mot de passe en clair de l'utilisateur)
+     * @param donnees  les données à signer ({@code email:nonce:timestamp})
      * @return la signature encodée en Base64
-     * @throws IllegalStateException si le calcul échoue
      */
-    public String compute(String key, String data) {
+    public String compute(String cle, String donnees) {
         try {
             // On crée un calculateur HMAC-SHA256.
-            Mac mac = Mac.getInstance(HMAC_ALGORITHM);
-            // On initialise le calculateur avec le mot de passe comme clé.
-            mac.init(new SecretKeySpec(
-                    key.getBytes(StandardCharsets.UTF_8), HMAC_ALGORITHM));
+            Mac calculateur = Mac.getInstance(ALGORITHME_HMAC);
+            // On initialise le calculateur avec la clé.
+            calculateur.init(new SecretKeySpec(
+                    cle.getBytes(StandardCharsets.UTF_8), ALGORITHME_HMAC));
             // On calcule la signature des données.
-            byte[] result = mac.doFinal(data.getBytes(StandardCharsets.UTF_8));
+            byte[] resultat = calculateur.doFinal(donnees.getBytes(StandardCharsets.UTF_8));
             // On encode le résultat en Base64 pour le transport HTTP.
-            return Base64.getEncoder().encodeToString(result);
+            return Base64.getEncoder().encodeToString(resultat);
         } catch (GeneralSecurityException e) {
             throw new IllegalStateException("Erreur de calcul HMAC", e);
         }
@@ -56,22 +55,18 @@ public class HmacService {
     /**
      * Compare deux signatures HMAC en temps constant.
      *
-     * <p>Utilise {@link MessageDigest#isEqual(byte[], byte[])} pour éviter
-     * toute fuite d'information par mesure du temps de réponse.</p>
-     *
-     * @param expected la signature attendue (calculée côté serveur)
-     * @param received la signature reçue du client
+     * @param attendue la signature attendue (calculée côté serveur)
+     * @param recue    la signature reçue du client
      * @return true si les deux signatures sont identiques
      */
-    public boolean compare(String expected, String received) {
+    public boolean compare(String attendue, String recue) {
         // Si l'une des deux signatures est nulle, ce n'est pas valide.
-        if (expected == null || received == null) {
+        if (attendue == null || recue == null) {
             return false;
         }
         // Comparaison en temps constant pour empêcher les attaques temporelles.
         return MessageDigest.isEqual(
-                expected.getBytes(StandardCharsets.UTF_8),
-                received.getBytes(StandardCharsets.UTF_8));
+                attendue.getBytes(StandardCharsets.UTF_8),
+                recue.getBytes(StandardCharsets.UTF_8));
     }
 }
-

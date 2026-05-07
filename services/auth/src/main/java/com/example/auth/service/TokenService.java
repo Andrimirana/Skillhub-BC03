@@ -20,70 +20,61 @@ import java.util.Date;
 import java.util.UUID;
 
 /**
- * Service de gestion des tokens d'accès Bearer (SSO).
+ * Service de gestion des jetons d'accès Bearer.
  *
- * <p>Émet un token UUID après chaque login réussi et le valide
+ * <p>Émet un jeton UUID après chaque login réussi et le valide
  * lors des accès aux endpoints protégés.</p>
  *
- * <p>Chaque token est valide pendant {@value #TOKEN_VALIDITY_MINUTES} minutes.</p>
- *
- * <p> Ce token simple UUID est pédagogique. En production, on utiliserait
- * un JWT signé (RS256/HS256) pour éviter la requête DB à chaque validation.</p>
+ * <p>Chaque jeton est valide pendant {@value #DUREE_VALIDITE_MIN} minutes.</p>
  */
 @Service
 public class TokenService {
 
 
-    /** Durée de validité d'un token en minutes. */
-    public static final int TOKEN_VALIDITY_MINUTES = 15;
+    /** Durée de validité d'un jeton en minutes. */
+    public static final int DUREE_VALIDITE_MIN = 15;
 
     // Clé secrète pour signer le JWT (à externaliser en prod)
     @Value("${jwt.secret:dev-secret-key-please-change}")
-    private String jwtSecret;
+    private String secretJwt;
 
-    private final AccessTokenRepository accessTokenRepository;
+    private final AccessTokenRepository depotJetons;
 
-    public TokenService(AccessTokenRepository accessTokenRepository) {
-        this.accessTokenRepository = accessTokenRepository;
+    public TokenService(AccessTokenRepository depotJetons) {
+        this.depotJetons = depotJetons;
     }
 
     /**
-     * Génère un nouveau token Bearer pour un utilisateur authentifié.
-     * Le token est persisté en base de données.
-     *
-     * @param user l'utilisateur authentifié
-     * @return le token d'accès créé
+     * Génère un nouveau jeton Bearer pour un utilisateur authentifié.
+     * Le jeton est persisté en base de données.
      */
     @Transactional
-    public AccessToken generate(User user) {
-        // On génère un identifiant unique (UUID) qui servira de token.
-        String tokenValue = UUID.randomUUID().toString();
-        // Le token est valable 15 minutes.
-        LocalDateTime expiresAt = LocalDateTime.now().plusMinutes(TOKEN_VALIDITY_MINUTES);
-        // On enregistre le token en base associé à l'utilisateur.
-        AccessToken token = new AccessToken(user, tokenValue, expiresAt);
-        return accessTokenRepository.save(token);
+    public AccessToken generate(User utilisateur) {
+        // On génère un identifiant unique (UUID) qui servira de jeton.
+        String valeurJeton = UUID.randomUUID().toString();
+        // Le jeton est valable 15 minutes.
+        LocalDateTime expireA = LocalDateTime.now().plusMinutes(DUREE_VALIDITE_MIN);
+        // On enregistre le jeton en base associé à l'utilisateur.
+        AccessToken jeton = new AccessToken(utilisateur, valeurJeton, expireA);
+        return depotJetons.save(jeton);
     }
 
     /**
      * Génère un JWT signé HS256 contenant les claims nécessaires aux middlewares Laravel.
-     * Claims embarqués : sub (email), userId, nom, role — valides TOKEN_VALIDITY_MINUTES minutes.
-     *
-     * @param user l'utilisateur authentifié
-     * @return le JWT signé
+     * Claims embarqués : sub (email), userId, nom, role — valides 15 minutes.
      */
-    public String generateJwt(User user) {
+    public String generateJwt(User utilisateur) {
         // Date courante et date d'expiration (now + 15 minutes).
-        Date now = new Date();
-        Date expiry = new Date(now.getTime() + TOKEN_VALIDITY_MINUTES * 60 * 1000L);
+        Date maintenant = new Date();
+        Date expiration = new Date(maintenant.getTime() + DUREE_VALIDITE_MIN * 60 * 1000L);
         // On construit le JWT avec les infos de l'utilisateur dans les claims.
         return Jwts.builder()
-                .setSubject(user.getEmail())
-                .setIssuedAt(now)
-                .setExpiration(expiry)
-                .claim("userId", user.getId())
-                .claim("nom",  user.getName()  != null ? user.getName()  : user.getEmail())
-                .claim("role", user.getRole()  != null ? user.getRole()  : "apprenant")
+                .setSubject(utilisateur.getEmail())
+                .setIssuedAt(maintenant)
+                .setExpiration(expiration)
+                .claim("userId", utilisateur.getId())
+                .claim("nom",  utilisateur.getName() != null ? utilisateur.getName() : utilisateur.getEmail())
+                .claim("role", utilisateur.getRole() != null ? utilisateur.getRole() : "apprenant")
                 // On signe le JWT avec l'algorithme HS256.
                 .signWith(getSigningKey(), SignatureAlgorithm.HS256)
                 .compact();
@@ -92,10 +83,6 @@ public class TokenService {
     /**
      * Valide la signature d'un JWT et retourne les claims utilisateur.
      * Utilisé par {@code POST /api/validate-token} pour les appels inter-services.
-     *
-     * @param jwt le token JWT Bearer reçu
-     * @return map {id, nom, email, role} extraite des claims
-     * @throws io.jsonwebtoken.JwtException si le token est invalide ou expiré
      */
     public java.util.Map<String, Object> validateJwtClaims(String jwt) {
         // On vérifie la signature et on extrait les claims (le contenu du JWT).
@@ -106,60 +93,53 @@ public class TokenService {
                 .getBody();
 
         // On construit la map de réponse à renvoyer aux microservices.
-        java.util.Map<String, Object> result = new java.util.HashMap<>();
-        result.put("id",    claims.get("userId"));
-        result.put("nom",   claims.getOrDefault("nom",  claims.getSubject()));
-        result.put("email", claims.getSubject());
-        result.put("role",  claims.getOrDefault("role", "apprenant"));
-        return result;
+        java.util.Map<String, Object> resultat = new java.util.HashMap<>();
+        resultat.put("id",    claims.get("userId"));
+        resultat.put("nom",   claims.getOrDefault("nom",  claims.getSubject()));
+        resultat.put("email", claims.getSubject());
+        resultat.put("role",  claims.getOrDefault("role", "apprenant"));
+        return resultat;
     }
 
     /**
-     * Dérive une clé HMAC-SHA256 de 256 bits depuis jwtSecret via SHA-256.
+     * Dérive une clé HMAC-SHA256 de 256 bits depuis le secret JWT via SHA-256.
      * Garantit une clé valide quelle que soit la longueur du secret configuré.
      */
     private Key getSigningKey() {
         try {
             // On dérive une clé de 256 bits depuis le secret via SHA-256.
             // Cela garantit que la clé est toujours valide pour HS256.
-            byte[] hash = MessageDigest.getInstance("SHA-256")
-                    .digest(jwtSecret.getBytes(StandardCharsets.UTF_8));
-            return Keys.hmacShaKeyFor(hash);
+            byte[] hachage = MessageDigest.getInstance("SHA-256")
+                    .digest(secretJwt.getBytes(StandardCharsets.UTF_8));
+            return Keys.hmacShaKeyFor(hachage);
         } catch (NoSuchAlgorithmException e) {
             throw new IllegalStateException("SHA-256 non disponible", e);
         }
     }
 
     /**
-     * Recherche l'utilisateur associé à un token Bearer valide.
-     *
-     * @param tokenValue la valeur UUID du token
-     * @return l'utilisateur propriétaire du token
-     * @throws AuthenticationFailedException si le token est introuvable ou expiré
+     * Recherche l'utilisateur associé à un jeton Bearer valide.
      */
     @Transactional(readOnly = true)
-    public User getUserByToken(String tokenValue) {
-        // On cherche le token en base. S'il n'existe pas, c'est un 401.
-        AccessToken token = accessTokenRepository.findByToken(tokenValue)
+    public User getUserByToken(String valeurJeton) {
+        // On cherche le jeton en base. S'il n'existe pas, c'est un 401.
+        AccessToken jeton = depotJetons.findByToken(valeurJeton)
                 .orElseThrow(() -> new AuthenticationFailedException(
                     "Token invalide ou expiré"));
 
-        // On vérifie que le token n'est pas expiré.
-        if (token.getExpiresAt().isBefore(LocalDateTime.now())) {
+        // On vérifie que le jeton n'est pas expiré.
+        if (jeton.getExpiresAt().isBefore(LocalDateTime.now())) {
             throw new AuthenticationFailedException("Token expiré");
         }
-        // Token valide : on retourne l'utilisateur associé.
-        return token.getUser();
+        // Jeton valide : on retourne l'utilisateur associé.
+        return jeton.getUser();
     }
 
     /**
-     * Supprime un token de la base de données (déconnexion — ajouté pour Skillhub).
-     *
-     * @param tokenValue la valeur UUID du token à invalider
+     * Supprime un jeton de la base de données (déconnexion).
      */
     @Transactional
-    public void deleteToken(String tokenValue) {
-        accessTokenRepository.deleteByToken(tokenValue);
+    public void deleteToken(String valeurJeton) {
+        depotJetons.deleteByToken(valeurJeton);
     }
 }
-

@@ -27,54 +27,55 @@ import java.util.Map;
  * <ul>
  *   <li>{@link #register} — inscription avec validation et chiffrement AES-256-GCM</li>
  *   <li>{@link #login} — protocole HMAC-SHA256 + nonce + timestamp</li>
- *   <li>{@link #changePassword} — changement de mot de passe sécurisé (TP5)</li>
- *   <li>{@link #getUserByToken} — validation Bearer token</li>
+ *   <li>{@link #changePassword} — changement de mot de passe sécurisé</li>
+ *   <li>{@link #getUserByToken} — validation du jeton Bearer</li>
  *   <li>{@link #evaluatePasswordStrength} — évaluation de force sans stockage</li>
  * </ul>
  *
  * <p>Constantes de sécurité :</p>
  * <ul>
- *   <li>{@code MAX_ATTEMPTS = 5} — seuil de verrouillage anti brute-force</li>
- *   <li>{@code LOCK_MINUTES = 2} — durée de verrouillage</li>
- *   <li>{@code TIMESTAMP_WINDOW_SECONDS = 60} — tolérance fenêtre timestamp</li>
- *   <li>{@code NONCE_TTL_SECONDS = 120} — durée de vie d'un nonce</li>
+ *   <li>{@code MAX_TENTATIVES = 5} — seuil de verrouillage anti brute-force</li>
+ *   <li>{@code DUREE_BLOCAGE_MIN = 2} — durée de verrouillage</li>
+ *   <li>{@code FENETRE_TIMESTAMP_S = 60} — tolérance fenêtre timestamp</li>
+ *   <li>{@code DUREE_VIE_NONCE_S = 120} — durée de vie d'un nonce</li>
  * </ul>
- *
- * <p> TP2 améliore le stockage mais ne protège pas encore contre le rejeu.</p>
- * <p> TP3 change le protocole — le mot de passe ne circule jamais sur le réseau.</p>
- * <p> Ce mécanisme est pédagogique. En industrie, on évite de stocker un mot de
- * passe réversible. On préférerait un hash non réversible avec protocole SRP/OPAQUE.</p>
  */
 @Service
 public class AuthService {
 
-    private static final Logger log = LoggerFactory.getLogger(AuthService.class);
+    private static final Logger journal = LoggerFactory.getLogger(AuthService.class);
 
     // ── Constantes de sécurité ────────────────────────────────────────────────
-    public static final int  MAX_ATTEMPTS              = 5;
-    public static final int  LOCK_MINUTES              = 2;
-    public static final long TIMESTAMP_WINDOW_SECONDS  = 60L;
-    public static final long NONCE_TTL_SECONDS         = 120L;
+    public static final int  MAX_TENTATIVES        = 5;
+    public static final int  DUREE_BLOCAGE_MIN     = 2;
+    public static final long FENETRE_TIMESTAMP_S   = 60L;
+    public static final long DUREE_VIE_NONCE_S     = 120L;
 
-    private final UserRepository          userRepository;
-    private final AuthNonceRepository     nonceRepository;
-    private final MasterKeyService        masterKeyService;
-    private final HmacService             hmacService;
-    private final TokenService            tokenService;
-    private final PasswordPolicyValidator passwordPolicy;
+    // Anciens noms conservés pour compatibilité avec les tests.
+    public static final int  MAX_ATTEMPTS              = MAX_TENTATIVES;
+    public static final int  LOCK_MINUTES              = DUREE_BLOCAGE_MIN;
+    public static final long TIMESTAMP_WINDOW_SECONDS  = FENETRE_TIMESTAMP_S;
+    public static final long NONCE_TTL_SECONDS         = DUREE_VIE_NONCE_S;
 
-    public AuthService(UserRepository userRepository,
-                       AuthNonceRepository nonceRepository,
-                       MasterKeyService masterKeyService,
-                       HmacService hmacService,
-                       TokenService tokenService,
-                       PasswordPolicyValidator passwordPolicy) {
-        this.userRepository   = userRepository;
-        this.nonceRepository  = nonceRepository;
-        this.masterKeyService = masterKeyService;
-        this.hmacService      = hmacService;
-        this.tokenService     = tokenService;
-        this.passwordPolicy   = passwordPolicy;
+    private final UserRepository          depotUtilisateurs;
+    private final AuthNonceRepository     depotNonces;
+    private final MasterKeyService        serviceCleMaitre;
+    private final HmacService             serviceHmac;
+    private final TokenService            serviceJeton;
+    private final PasswordPolicyValidator validateurMotDePasse;
+
+    public AuthService(UserRepository depotUtilisateurs,
+                       AuthNonceRepository depotNonces,
+                       MasterKeyService serviceCleMaitre,
+                       HmacService serviceHmac,
+                       TokenService serviceJeton,
+                       PasswordPolicyValidator validateurMotDePasse) {
+        this.depotUtilisateurs    = depotUtilisateurs;
+        this.depotNonces          = depotNonces;
+        this.serviceCleMaitre     = serviceCleMaitre;
+        this.serviceHmac          = serviceHmac;
+        this.serviceJeton         = serviceJeton;
+        this.validateurMotDePasse = validateurMotDePasse;
     }
 
     // ════════════════════════════════════════════════════════════════════
@@ -92,16 +93,9 @@ public class AuthService {
      *   <li>Vérification unicité email</li>
      *   <li>Chiffrement AES-256-GCM + persistance</li>
      * </ol>
-     *
-     * @param email           adresse email de l'utilisateur
-     * @param password        mot de passe choisi
-     * @param passwordConfirm confirmation du mot de passe
-     * @return map contenant {@code message} et {@code email}
-     * @throws InvalidInputException     si les données sont invalides
-     * @throws ResourceConflictException si l'email est déjà utilisé
      */
     @Transactional
-    public Map<String, String> register(String email, String password, String passwordConfirm) {
+    public Map<String, String> register(String email, String motDePasse, String confirmation) {
         // Validation email
         if (email == null || email.isBlank()) {
             throw new InvalidInputException("L'email ne peut pas être vide");
@@ -110,23 +104,23 @@ public class AuthService {
             throw new InvalidInputException("Format d'email invalide");
         }
         // Validation mot de passe
-        passwordPolicy.validate(password);
+        validateurMotDePasse.validate(motDePasse);
 
         // Vérification correspondance
-        if (!password.equals(passwordConfirm)) {
+        if (!motDePasse.equals(confirmation)) {
             throw new InvalidInputException(
                 "Le mot de passe et sa confirmation ne correspondent pas");
         }
         // Unicité email
-        if (userRepository.existsByEmail(email)) {
-            log.warn("Inscription refusée — email déjà existant : {}", email);
+        if (depotUtilisateurs.existsByEmail(email)) {
+            journal.warn("Inscription refusée — email déjà existant : {}", email);
             throw new ResourceConflictException("Cet email est déjà utilisé");
         }
         // Chiffrement + persistance
-        String encrypted = masterKeyService.encrypt(password);
-        userRepository.save(new User(email, encrypted));
+        String motDePasseChiffre = serviceCleMaitre.encrypt(motDePasse);
+        depotUtilisateurs.save(new User(email, motDePasseChiffre));
 
-        log.info("Inscription réussie : {}", email);
+        journal.info("Inscription réussie : {}", email);
         return Map.of("message", "Inscription réussie", "email", email);
     }
 
@@ -136,151 +130,121 @@ public class AuthService {
 
     /**
      * Authentifie un utilisateur via le protocole HMAC-SHA256.
-     *
-     * <p>Vérifications dans cet ordre précis :</p>
-     * <ol>
-     *   <li>Email non vide</li>
-     *   <li>Email existant en base (401 si inconnu)</li>
-     *   <li>Compte non verrouillé (429 si bloqué)</li>
-     *   <li>Timestamp dans la fenêtre ±60 secondes (401 si hors fenêtre)</li>
-     *   <li>Nonce non encore utilisé — anti-rejeu (401 si rejoué)</li>
-     *   <li>Enregistrement du nonce (TTL 120s)</li>
-     *   <li>Recalcul HMAC côté serveur</li>
-     *   <li>Comparaison en temps constant (401 si HMAC invalide)</li>
-     *   <li>Réinitialisation compteur échecs + émission token (200)</li>
-     * </ol>
-     *
-     * @param req la requête de login contenant email, nonce, timestamp et hmac
-     * @return la réponse contenant accessToken et expiresAt
      */
     @Transactional(noRollbackFor = RuntimeException.class)
-    public LoginResponse login(LoginRequest req) {
+    public LoginResponse login(LoginRequest requete) {
         // 1. Email non vide
-        if (req.email() == null || req.email().isBlank()) {
+        if (requete.email() == null || requete.email().isBlank()) {
             throw new InvalidInputException("L'email ne peut pas être vide");
         }
 
         // 2. Email existe
-        User user = userRepository.findByEmail(req.email())
+        User utilisateur = depotUtilisateurs.findByEmail(requete.email())
                 .orElseThrow(() -> {
-                    log.warn("Login échoué — email inconnu : {}", req.email());
+                    journal.warn("Login échoué — email inconnu : {}", requete.email());
                     return new AuthenticationFailedException("Identifiants incorrects");
                 });
 
         // 3. Compte non verrouillé
-        if (user.getLockUntil() != null && user.getLockUntil().isAfter(LocalDateTime.now())) {
-            log.warn("Login bloqué — compte verrouillé : {}", req.email());
+        if (utilisateur.getLockUntil() != null && utilisateur.getLockUntil().isAfter(LocalDateTime.now())) {
+            journal.warn("Login bloqué — compte verrouillé : {}", requete.email());
             throw new AuthenticationFailedException(
-                "Compte bloqué — trop de tentatives. Réessayez dans " + LOCK_MINUTES + " minutes.");
+                "Compte bloqué — trop de tentatives. Réessayez dans " + DUREE_BLOCAGE_MIN + " minutes.");
         }
 
         // 4. Timestamp dans la fenêtre ±60s
-        long now  = Instant.now().getEpochSecond();
-        long diff = Math.abs(now - req.timestamp());
-        if (diff > TIMESTAMP_WINDOW_SECONDS) {
-            incrementFailedAttempts(user);
-            log.warn("Login échoué — timestamp hors fenêtre : {}", req.email());
+        long maintenant = Instant.now().getEpochSecond();
+        long ecart      = Math.abs(maintenant - requete.timestamp());
+        if (ecart > FENETRE_TIMESTAMP_S) {
+            incrementerTentativesEchouees(utilisateur);
+            journal.warn("Login échoué — timestamp hors fenêtre : {}", requete.email());
             throw new AuthenticationFailedException("Identifiants incorrects");
         }
 
         // 5. Nonce non encore utilisé
-        if (nonceRepository.findByUserAndNonce(user, req.nonce()).isPresent()) {
-            incrementFailedAttempts(user);
-            log.warn("Login échoué — nonce déjà utilisé (rejeu) : {}", req.email());
+        if (depotNonces.findByUserAndNonce(utilisateur, requete.nonce()).isPresent()) {
+            incrementerTentativesEchouees(utilisateur);
+            journal.warn("Login échoué — nonce déjà utilisé (rejeu) : {}", requete.email());
             throw new AuthenticationFailedException("Identifiants incorrects");
         }
 
         // 6. Enregistrement du nonce (TTL 120s)
-        AuthNonce authNonce = new AuthNonce(
-                user, req.nonce(),
-                LocalDateTime.now().plusSeconds(NONCE_TTL_SECONDS));
-        nonceRepository.save(authNonce);
+        AuthNonce nonceAuth = new AuthNonce(
+                utilisateur, requete.nonce(),
+                LocalDateTime.now().plusSeconds(DUREE_VIE_NONCE_S));
+        depotNonces.save(nonceAuth);
 
         // 7-8. Recalcul HMAC + comparaison en temps constant
-        String passwordPlain = masterKeyService.decrypt(user.getPasswordEncrypted());
-        String message       = req.email() + ":" + req.nonce() + ":" + req.timestamp();
-        String expected      = hmacService.compute(passwordPlain, message);
+        String motDePasseEnClair = serviceCleMaitre.decrypt(utilisateur.getPasswordEncrypted());
+        String message           = requete.email() + ":" + requete.nonce() + ":" + requete.timestamp();
+        String hmacAttendu       = serviceHmac.compute(motDePasseEnClair, message);
 
-        if (!hmacService.compare(expected, req.hmac())) {
-            incrementFailedAttempts(user);
-            log.warn("Login échoué — HMAC invalide : {}", req.email());
+        if (!serviceHmac.compare(hmacAttendu, requete.hmac())) {
+            incrementerTentativesEchouees(utilisateur);
+            journal.warn("Login échoué — HMAC invalide : {}", requete.email());
             throw new AuthenticationFailedException("Identifiants incorrects");
         }
 
-        // 9. Succès — réinitialisation compteur + émission token
-        user.setFailedAttempts(0);
-        user.setLockUntil(null);
-        userRepository.save(user);
+        // 9. Succès — réinitialisation compteur + émission jeton
+        utilisateur.setFailedAttempts(0);
+        utilisateur.setLockUntil(null);
+        depotUtilisateurs.save(utilisateur);
 
-        authNonce.setConsumed(true);
-        nonceRepository.save(authNonce);
+        nonceAuth.setConsumed(true);
+        depotNonces.save(nonceAuth);
 
-        AccessToken token = tokenService.generate(user);
-        String jwt = tokenService.generateJwt(user);
-        log.info("Connexion réussie : {}", req.email());
-        return new LoginResponse(token.getToken(), jwt, token.getExpiresAt());
+        AccessToken jeton = serviceJeton.generate(utilisateur);
+        String jwt = serviceJeton.generateJwt(utilisateur);
+        journal.info("Connexion réussie : {}", requete.email());
+        return new LoginResponse(jeton.getToken(), jwt, jeton.getExpiresAt());
     }
 
     // ════════════════════════════════════════════════════════════════════
-    //  CHANGEMENT DE MOT DE PASSE (TP5)
+    //  CHANGEMENT DE MOT DE PASSE
     // ════════════════════════════════════════════════════════════════════
 
     /**
      * Change le mot de passe d'un utilisateur authentifié.
-     *
-     * <p>Étapes :</p>
-     * <ol>
-     *   <li>Token Bearer valide → utilisateur identifié</li>
-     *   <li>Déchiffrement AES-GCM + comparaison avec oldPassword</li>
-     *   <li>newPassword == confirmPassword</li>
-     *   <li>Politique de sécurité sur newPassword</li>
-     *   <li>Chiffrement AES-256-GCM + mise à jour en base</li>
-     * </ol>
-     *
-     * @param tokenValue le Bearer token de l'utilisateur connecté
-     * @param req        la requête contenant oldPassword, newPassword, confirmPassword
-     * @throws AuthenticationFailedException si le token est invalide ou l'ancien mot de passe incorrect
-     * @throws InvalidInputException         si les nouveaux mots de passe ne correspondent pas ou sont trop faibles
      */
     @Transactional
-    public void changePassword(String tokenValue, ChangePasswordRequest req) {
-        // 1. Validation token — JWT (stateless) ou opaque UUID (DB lookup)
-        User user;
-        if (tokenValue != null && tokenValue.startsWith("eyJ")) {
+    public void changePassword(String valeurJeton, ChangePasswordRequest requete) {
+        // 1. Validation jeton — JWT (stateless) ou opaque UUID (lookup en base)
+        User utilisateur;
+        if (valeurJeton != null && valeurJeton.startsWith("eyJ")) {
             try {
-                java.util.Map<String, Object> claims = tokenService.validateJwtClaims(tokenValue);
+                java.util.Map<String, Object> claims = serviceJeton.validateJwtClaims(valeurJeton);
                 String email = (String) claims.get("email");
-                user = userRepository.findByEmail(email)
+                utilisateur = depotUtilisateurs.findByEmail(email)
                         .orElseThrow(() -> new AuthenticationFailedException("Utilisateur introuvable"));
             } catch (io.jsonwebtoken.JwtException e) {
                 throw new AuthenticationFailedException("Token invalide ou expiré");
             }
         } else {
-            user = tokenService.getUserByToken(tokenValue);
+            utilisateur = serviceJeton.getUserByToken(valeurJeton);
         }
 
         // 2. Vérification ancien mot de passe
-        String currentPlain = masterKeyService.decrypt(user.getPasswordEncrypted());
-        if (!currentPlain.equals(req.oldPassword())) {
-            log.warn("Changement MDP échoué ancien mot de passe incorrect : {}", user.getEmail());
+        String motDePasseActuel = serviceCleMaitre.decrypt(utilisateur.getPasswordEncrypted());
+        if (!motDePasseActuel.equals(requete.oldPassword())) {
+            journal.warn("Changement MDP échoué ancien mot de passe incorrect : {}", utilisateur.getEmail());
             throw new AuthenticationFailedException("Ancien mot de passe incorrect");
         }
 
-        // Correspondance nouveaux mots de passe
-        if (!req.newPassword().equals(req.confirmPassword())) {
+        // 3. Correspondance nouveaux mots de passe
+        if (!requete.newPassword().equals(requete.confirmPassword())) {
             throw new InvalidInputException(
                 "Le nouveau mot de passe et sa confirmation ne correspondent pas");
         }
 
         // 4. Politique de sécurité
-        passwordPolicy.validate(req.newPassword());
+        validateurMotDePasse.validate(requete.newPassword());
 
         // 5. Chiffrement + persistance
-        String encrypted = masterKeyService.encrypt(req.newPassword());
-        user.setPasswordEncrypted(encrypted);
-        userRepository.save(user);
+        String motDePasseChiffre = serviceCleMaitre.encrypt(requete.newPassword());
+        utilisateur.setPasswordEncrypted(motDePasseChiffre);
+        depotUtilisateurs.save(utilisateur);
 
-        log.info("Mot de passe changé avec succès : {}", user.getEmail());
+        journal.info("Mot de passe changé avec succès : {}", utilisateur.getEmail());
     }
 
     // ════════════════════════════════════════════════════════════════════
@@ -288,23 +252,17 @@ public class AuthService {
     // ════════════════════════════════════════════════════════════════════
 
     /**
-     * Récupère l'utilisateur associé à un Bearer token valide.
-     *
-     * @param tokenValue la valeur du token
-     * @return l'utilisateur propriétaire du token
+     * Récupère l'utilisateur associé à un jeton Bearer valide.
      */
-    public User getUserByToken(String tokenValue) {
-        return tokenService.getUserByToken(tokenValue);
+    public User getUserByToken(String valeurJeton) {
+        return serviceJeton.getUserByToken(valeurJeton);
     }
 
     /**
      * Évalue la force d'un mot de passe sans le stocker.
-     *
-     * @param password le mot de passe à évaluer
-     * @return {@code "WEAK"}, {@code "MEDIUM"} ou {@code "STRONG"}
      */
-    public String evaluatePasswordStrength(String password) {
-        return passwordPolicy.evaluateStrength(password);
+    public String evaluatePasswordStrength(String motDePasse) {
+        return validateurMotDePasse.evaluateStrength(motDePasse);
     }
 
     // ════════════════════════════════════════════════════════════════════
@@ -312,99 +270,75 @@ public class AuthService {
     // ════════════════════════════════════════════════════════════════════
 
     /**
-     * Inscrit un utilisateur avec nom et rôle (Skillhub) et retourne un token Bearer.
-     * Réutilise toute la logique de validation d'Auth_TP1.
-     *
-     * @param email           adresse email
-     * @param password        mot de passe
-     * @param passwordConfirm confirmation du mot de passe
-     * @param name            nom complet de l'utilisateur
-     * @param role            rôle : formateur ou apprenant
-     * @return le token d'accès généré après inscription réussie
+     * Inscrit un utilisateur avec nom et rôle (Skillhub) et retourne un jeton Bearer.
      */
     @Transactional
-    public AccessToken registerSkillhubUser(String email, String password,
-                                            String passwordConfirm,
-                                            String name, String role) {
+    public AccessToken registerSkillhubUser(String email, String motDePasse,
+                                            String confirmation,
+                                            String nom, String role) {
         if (email == null || email.isBlank()) {
             throw new InvalidInputException("L'email ne peut pas être vide");
         }
         if (!email.matches("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$")) {
             throw new InvalidInputException("Format d'email invalide");
         }
-        passwordPolicy.validate(password);
+        validateurMotDePasse.validate(motDePasse);
 
-        if (!password.equals(passwordConfirm)) {
+        if (!motDePasse.equals(confirmation)) {
             throw new InvalidInputException(
                 "Le mot de passe et sa confirmation ne correspondent pas");
         }
-        if (userRepository.existsByEmail(email)) {
-            log.warn("Inscription refusée — email déjà existant : {}", email);
+        if (depotUtilisateurs.existsByEmail(email)) {
+            journal.warn("Inscription refusée — email déjà existant : {}", email);
             throw new ResourceConflictException("Cet email est déjà utilisé");
         }
 
-        String encrypted = masterKeyService.encrypt(password);
-        User user = new User(email, encrypted);
-        user.setName(name);
-        user.setRole(role != null ? role : "apprenant");
-        userRepository.save(user);
+        String motDePasseChiffre = serviceCleMaitre.encrypt(motDePasse);
+        User utilisateur = new User(email, motDePasseChiffre);
+        utilisateur.setName(nom);
+        utilisateur.setRole(role != null ? role : "apprenant");
+        depotUtilisateurs.save(utilisateur);
 
-        log.info("Inscription Skillhub réussie : {} (rôle={})", email, user.getRole());
-        return tokenService.generate(user);
+        journal.info("Inscription Skillhub réussie : {} (rôle={})", email, utilisateur.getRole());
+        return serviceJeton.generate(utilisateur);
     }
 
     /**
-     * Invalide un token Bearer (déconnexion Skillhub).
-     * Pour les tokens UUID : suppression en base. Pour les JWT : opération silencieuse
-     * (les JWTs sont stateless et expirent automatiquement).
-     *
-     * @param tokenValue la valeur du token à invalider (UUID ou JWT)
+     * Invalide un jeton Bearer (déconnexion Skillhub).
      */
     @Transactional
-    public void logout(String tokenValue) {
+    public void logout(String valeurJeton) {
         try {
-            tokenService.deleteToken(tokenValue);
+            serviceJeton.deleteToken(valeurJeton);
         } catch (Exception ignored) {
-            // JWT stateless : le token n'est pas stocké en base — expire naturellement.
+            // JWT stateless : le jeton n'est pas stocké en base — expire naturellement.
         }
-        log.info("Logout Skillhub effectué");
+        journal.info("Logout Skillhub effectué");
     }
 
     /**
      * Génère un JWT signé pour un utilisateur (délégation vers TokenService).
-     * Utilisé par les endpoints Skillhub pour retourner un JWT à la place d'un UUID.
-     *
-     * @param user l'utilisateur authentifié
-     * @return le JWT signé HS256
      */
-    public String generateJwt(User user) {
-        return tokenService.generateJwt(user);
+    public String generateJwt(User utilisateur) {
+        return serviceJeton.generateJwt(utilisateur);
     }
 
     /**
      * Valide un JWT et retourne les claims utilisateur sous forme de Map.
-     * Appelé par {@code POST /api/validate-token} et {@code GET /api/profil}.
-     *
-     * @param jwt le token JWT à valider
-     * @return map {id, nom, email, role} extraite des claims
-     * @throws io.jsonwebtoken.JwtException si le JWT est invalide ou expiré
      */
     public java.util.Map<String, Object> validateJwtClaims(String jwt) {
-        return tokenService.validateJwtClaims(jwt);
+        return serviceJeton.validateJwtClaims(jwt);
     }
 
     /**
      * Incrémente le compteur d'échecs et verrouille le compte si le seuil est atteint.
-     *
-     * @param user l'utilisateur en échec de connexion
      */
-    private void incrementFailedAttempts(User user) {
-        user.setFailedAttempts(user.getFailedAttempts() + 1);
-        if (user.getFailedAttempts() >= MAX_ATTEMPTS) {
-            user.setLockUntil(LocalDateTime.now().plusMinutes(LOCK_MINUTES));
-            log.warn("Compte verrouillé pour {} minutes : {}", LOCK_MINUTES, user.getEmail());
+    private void incrementerTentativesEchouees(User utilisateur) {
+        utilisateur.setFailedAttempts(utilisateur.getFailedAttempts() + 1);
+        if (utilisateur.getFailedAttempts() >= MAX_TENTATIVES) {
+            utilisateur.setLockUntil(LocalDateTime.now().plusMinutes(DUREE_BLOCAGE_MIN));
+            journal.warn("Compte verrouillé pour {} minutes : {}", DUREE_BLOCAGE_MIN, utilisateur.getEmail());
         }
-        userRepository.save(user);
+        depotUtilisateurs.save(utilisateur);
     }
 }
-

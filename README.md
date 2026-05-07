@@ -102,7 +102,7 @@ Objectifs Bloc 03 : industrialisation, automatisation, qualite logicielle.
 ### Base de donnees
 
 - MySQL : 4 bases metier (auth, catalog, inscription, audio)
-- MongoDB : journal d'activite uniquement (audit trail)
+- MongoDB : journal d'activite uniquement
 
 ### Orchestration et DevOps
 
@@ -392,4 +392,10 @@ php artisan config:clear
 Les acces sont controles par des guards (RouteProtegee, RouteInvite) selon le role et la session.
 
 13. Utilisation d'intelligence artificielle
+- ChatGPT: 
+- ChatGPT: 
+- ChatGPT: 
+- ChatGPT: 
+- ChatGPT: 
+- ChatGPT: 
 - ChatGPT: 

@@ -26,24 +26,17 @@ import java.util.Map;
  *   "path":      "/api/auth/login"
  * }
  * </pre>
- *
- * <p> Cette implémentation est pédagogique. Ne jamais utiliser en production
- * sans audit de sécurité complet.</p>
  */
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
     /**
      * Gère les erreurs de validation d'entrée (HTTP 400).
-     *
-     * @param ex      l'exception levée
-     * @param request la requête HTTP courante
-     * @return réponse JSON 400 Bad Request
      */
     @ExceptionHandler(InvalidInputException.class)
     public ResponseEntity<Map<String, Object>> handleInvalidInput(
-            InvalidInputException ex, HttpServletRequest request) {
-        return buildResponse(HttpStatus.BAD_REQUEST, ex.getMessage(), request.getRequestURI());
+            InvalidInputException erreur, HttpServletRequest requete) {
+        return construireReponse(HttpStatus.BAD_REQUEST, erreur.getMessage(), requete.getRequestURI());
     }
 
     /**
@@ -51,53 +44,39 @@ public class GlobalExceptionHandler {
      *
      * <p>Si le message contient "bloqué", retourne HTTP 429 Too Many Requests
      * pour signaler un compte verrouillé suite à trop de tentatives échouées.</p>
-     *
-     * @param ex      l'exception levée
-     * @param request la requête HTTP courante
-     * @return réponse JSON 401 ou 429
      */
     @ExceptionHandler(AuthenticationFailedException.class)
     public ResponseEntity<Map<String, Object>> handleAuthFailed(
-            AuthenticationFailedException ex, HttpServletRequest request) {
+            AuthenticationFailedException erreur, HttpServletRequest requete) {
         // Si le message indique un compte bloqué, on retourne 429 (trop de tentatives).
         // Sinon, on retourne 401 (identifiants invalides).
-        HttpStatus status = (ex.getMessage() != null && ex.getMessage().contains("bloqué"))
+        HttpStatus statut = (erreur.getMessage() != null && erreur.getMessage().contains("bloqué"))
                 ? HttpStatus.TOO_MANY_REQUESTS
                 : HttpStatus.UNAUTHORIZED;
-        return buildResponse(status, ex.getMessage(), request.getRequestURI());
+        return construireReponse(statut, erreur.getMessage(), requete.getRequestURI());
     }
 
     /**
      * Gère les conflits de ressource (HTTP 409).
-     *
-     * @param ex      l'exception levée
-     * @param request la requête HTTP courante
-     * @return réponse JSON 409 Conflict
      */
     @ExceptionHandler(ResourceConflictException.class)
     public ResponseEntity<Map<String, Object>> handleConflict(
-            ResourceConflictException ex, HttpServletRequest request) {
-        return buildResponse(HttpStatus.CONFLICT, ex.getMessage(), request.getRequestURI());
+            ResourceConflictException erreur, HttpServletRequest requete) {
+        return construireReponse(HttpStatus.CONFLICT, erreur.getMessage(), requete.getRequestURI());
     }
 
     /**
      * Construit la réponse JSON standardisée.
-     *
-     * @param status  code HTTP
-     * @param message message d'erreur
-     * @param path    chemin de la requête
-     * @return ResponseEntity avec corps JSON
      */
-    private ResponseEntity<Map<String, Object>> buildResponse(
-            HttpStatus status, String message, String path) {
+    private ResponseEntity<Map<String, Object>> construireReponse(
+            HttpStatus statut, String message, String chemin) {
         // On construit un corps JSON standardisé pour toutes les erreurs.
-        Map<String, Object> body = new LinkedHashMap<>();
-        body.put("timestamp", LocalDateTime.now().toString());
-        body.put("status",    status.value());
-        body.put("error",     status.getReasonPhrase());
-        body.put("message",   message);
-        body.put("path",      path);
-        return ResponseEntity.status(status).body(body);
+        Map<String, Object> corps = new LinkedHashMap<>();
+        corps.put("timestamp", LocalDateTime.now().toString());
+        corps.put("status",    statut.value());
+        corps.put("error",     statut.getReasonPhrase());
+        corps.put("message",   message);
+        corps.put("path",      chemin);
+        return ResponseEntity.status(statut).body(corps);
     }
 }
-

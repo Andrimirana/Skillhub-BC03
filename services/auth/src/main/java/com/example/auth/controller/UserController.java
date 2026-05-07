@@ -22,47 +22,40 @@ import java.util.Map;
 @RequestMapping("/api")
 public class UserController {
 
-    private final AuthService authService;
+    private final AuthService serviceAuth;
 
-    public UserController(AuthService authService) {
-        this.authService = authService;
+    public UserController(AuthService serviceAuth) {
+        this.serviceAuth = serviceAuth;
     }
 
     /**
      * Retourne les informations de l'utilisateur authentifié.
      *
      * <p>Requiert un header {@code Authorization: Bearer <token>} valide.</p>
-     *
-     * @param authHeader header {@code Authorization: Bearer <token>}
-     * @return HTTP 200 avec les informations de l'utilisateur
      */
     @GetMapping("/me")
     public ResponseEntity<Map<String, Object>> getMe(
-            @RequestHeader("Authorization") String authHeader) {
-        // On récupère le token Bearer depuis le header.
-        String token = extractBearerToken(authHeader);
-        // On retrouve l'utilisateur correspondant à ce token.
-        User   user  = authService.getUserByToken(token);
+            @RequestHeader("Authorization") String enteteAuth) {
+        // On récupère le jeton Bearer depuis le header.
+        String jeton = extraireJetonBearer(enteteAuth);
+        // On retrouve l'utilisateur correspondant à ce jeton.
+        User utilisateur = serviceAuth.getUserByToken(jeton);
         // On renvoie les infos publiques de l'utilisateur connecté.
         return ResponseEntity.ok(Map.of(
-                "email",     user.getEmail(),
-                "id",        user.getId(),
-                "createdAt", user.getCreatedAt().toString()
+                "email",     utilisateur.getEmail(),
+                "id",        utilisateur.getId(),
+                "createdAt", utilisateur.getCreatedAt().toString()
         ));
     }
 
     /**
-     * Extrait la valeur du token depuis le header Authorization.
-     *
-     * @param authHeader valeur du header {@code Authorization}
-     * @return la valeur du token Bearer
+     * Extrait la valeur du jeton depuis le header Authorization.
      */
-    private String extractBearerToken(String authHeader) {
-        // On enlève le préfixe "Bearer " pour ne garder que le token.
-        if (authHeader != null && authHeader.startsWith("Bearer ")) {
-            return authHeader.substring(7);
+    private String extraireJetonBearer(String enteteAuth) {
+        // On enlève le préfixe "Bearer " pour ne garder que le jeton.
+        if (enteteAuth != null && enteteAuth.startsWith("Bearer ")) {
+            return enteteAuth.substring(7);
         }
-        return authHeader;
+        return enteteAuth;
     }
 }
-
