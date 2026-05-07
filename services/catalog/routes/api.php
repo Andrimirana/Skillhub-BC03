@@ -17,7 +17,7 @@ Route::post('/test-post', function (Request $request) {
 // Routes publiques
 Route::get('/formations',                   [FormationController::class, 'index']);
 Route::get('/formations/{formation}',       [FormationController::class, 'show']);
-Route::get('/formations/{format363ion}/modules', [ModuleController::class, 'index']);
+Route::get('/formations/{formation}/modules',    [ModuleController::class, 'index']);
 Route::get('/formations/{formationId}/logs', [ActivityLogController::class, 'getByFormation']);
 
 // Routes privées  token validé via le service Auth
