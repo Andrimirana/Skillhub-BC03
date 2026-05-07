@@ -390,3 +390,6 @@ php artisan config:clear
 | `*`                       | Public      | Redirect           | Redirection vers l'accueil pour route inconnue       |
 
 Les acces sont controles par des guards (RouteProtegee, RouteInvite) selon le role et la session.
+
+13. Utilisation d'intelligence artificielle
+- ChatGPT: 
