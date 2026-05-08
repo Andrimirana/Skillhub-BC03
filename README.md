@@ -1,12 +1,13 @@
-# SkillHub - Bloc 03 - Cloud, DevOps et Architecture
+# SkillHub - Bloc 04 - Cloud, DevOps et Architecture
 
 ## Demarrage rapide
 
-Les microservices tournent en natif sur la machine de developpement. Il faut PHP 8.4, Java 17 et Node 18+.
+Les microservices tournent en natif. Pre-requis : PHP 8.4, Java 17, Node 18+.
 
 ```powershell
 # Service Auth (Spring Boot)
 cd services/auth
+$env:APP_MASTER_KEY = "dev-master-key-32-chars-minimum-please"
 .\mvnw spring-boot:run
 
 # Service Catalog (Laravel)
@@ -25,10 +26,11 @@ npm install
 npm run dev
 ```
 
-**Documentation complete :**
+Documentation complete :
 
-- [PROJECT_CONTEXT.md](PROJECT_CONTEXT.md) - vue d'ensemble du projet
+- [GUIDE_DEMARRAGE_LOCAL.md](GUIDE_DEMARRAGE_LOCAL.md) - guide pas-a-pas pour lancer la stack
 - [RAPPORT_ONBOARDING.md](RAPPORT_ONBOARDING.md) - onboarding developpeur junior
+- [RAPPORT_QUALITE.md](RAPPORT_QUALITE.md) - rapport SonarCloud avant/apres
 - [contributing.md](contributing.md) - guide de contribution
 
 ---
@@ -47,12 +49,12 @@ npm run dev
 10. Contribution
 11. References et documentation
 12. Pages et routes principales (Frontend)
-
+13. Utilisation d'intelligence artificielle
 ---
 
 ## 1. Presentation generale
 
-SkillHub est une plateforme web collaborative de mise en relation entre formateurs et apprenants, developpee dans le cadre du Bachelor Concepteur Developpeur Web Full Stack (Bloc 03 : Cloud, DevOps et Architecture, Promotion 2025/2026).
+SkillHub est une plateforme web qui met en relation formateurs et apprenants. Le projet est realise dans le cadre du Bachelor Concepteur Developpeur Web Full Stack (Bloc 04 : Cloud, DevOps et Architecture).
 
 Ce depot regroupe :
 
@@ -63,9 +65,6 @@ Ce depot regroupe :
 - Une execution en local natif (PHP CLI, Maven, npm)
 - Un pipeline CI/CD complet
 
-Objectifs Bloc 03 : industrialisation, automatisation, qualite logicielle.
-
----
 
 ## 2. Architecture technique
 
@@ -78,22 +77,24 @@ Objectifs Bloc 03 : industrialisation, automatisation, qualite logicielle.
 
 #### Auth - Spring Boot 3 / Java 17 (port 8011)
 
-- Authentification par HMAC-SHA256 : le client envoie `{email, nonce, timestamp, hmac}` ou `hmac = HMAC_SHA256(cle=motDePasse, donnees="email:nonce:timestamp")`
-- Generation de tokens JWT HS256 (expiration 15 min) signes avec une cle derivee par SHA-256
+- Authentification HMAC-SHA256 : le client envoie `{email, nonce, timestamp, hmac}` ou `hmac = HMAC_SHA256(cle=motDePasse, donnees="email:nonce:timestamp")`
+- Generation de tokens JWT HS256 (15 min) signes via cle derivee SHA-256
 - Endpoint `/api/validate-token` appele par les middlewares Laravel pour verifier chaque requete
-- Protection anti-rejeu : nonce unique + fenetre timestamp de 5 minutes
-- Injecte via `APP_MASTER_KEY` et `JWT_SECRET` (jamais en dur)
+- Anti-rejeu : nonce unique + fenetre timestamp 5 min
+- Secrets injectes via `APP_MASTER_KEY` et `JWT_SECRET`
 
 #### Catalog - Laravel 13 / PHP 8.4 (port 8012)
 
 - CRUD formations, modules, recherche filtree, attribution formateurs
-- Chaque requete protegee verifie le JWT aupres du service Auth avant de repondre
+- Notation des formations (1 a 5) par les apprenants inscrits, avec moyenne et nombre d'avis
+- Liste des apprenants inscrits (vue formateur proprietaire)
+- Chaque requete protegee verifie le JWT aupres du service Auth
 
 #### Inscription - Laravel 13 / PHP 8.4 (port 8013)
 
 - Gestion des inscriptions apprenants, suivi de progression
-- Limite metier : 5 inscriptions actives maximum par apprenant (HTTP 400 si depasse)
-- Communique avec Auth (validation JWT) et Catalog (verification formation existante)
+- Limite metier : 5 inscriptions actives maximum (HTTP 400 a la 6e)
+- Communique avec Auth (validation JWT) et Catalog (verification formation)
 
 #### Audio - PHP / AES-256 (port 8014)
 
@@ -125,13 +126,19 @@ Objectifs Bloc 03 : industrialisation, automatisation, qualite logicielle.
 
 - CRUD formations, modules, recherche filtree
 - Attribution des formations aux formateurs
-- Gestion des statuts, categories, niveaux, duree, prix
+- Statuts, categories, niveaux, duree, prix
+- Notation par les apprenants inscrits, moyenne et nombre d'avis sur chaque formation
 
 ### Inscriptions
 
 - Inscription a une formation, suivi des apprenants
-- Gestion des listes d'inscrits, validation, annulation
+- Liste des inscrits, validation, annulation
 - Limite metier : 5 inscriptions actives maximum
+
+### Vue formateur
+
+- Liste des apprenants inscrits a une formation (id, nom, email, progression, date d'inscription)
+- Reservee au formateur proprietaire de la formation
 
 ### Frontend
 
@@ -150,48 +157,43 @@ Objectifs Bloc 03 : industrialisation, automatisation, qualite logicielle.
 
 `SkillhubControllerTest.java` couvre tous les endpoints (register, login, profil, change-password, validate-token).
 
-`MasterKeyAbsentTest.java` verifie que l'application refuse de demarrer sans `APP_MASTER_KEY`.
+`MasterKeyAbsentTest.java` verifie le refus de demarrage sans `APP_MASTER_KEY`.
 
 #### Catalog - Laravel (PHPUnit + PCov)
 
-`FormationControllerTest.php` couvre la liste publique, l'increment des vues, la creation/modification/suppression par formateur, les controles de role (apprenant interdit) et de propriete (formation d'autrui interdite).
+`FormationControllerTest.php` couvre la liste publique, l'increment des vues, le CRUD formateur, les controles de role et de propriete.
 
-`ModuleControllerTest.php` couvre le CRUD des modules avec les memes controles.
+`ModuleControllerTest.php` couvre le CRUD des modules.
 
-`MongoActivityLoggerTest.php` couvre les logs d'activite MongoDB.
+`RatingControllerTest.php` couvre la notation : 201 OK, 400 doublon, 400 hors intervalle, 403 non inscrit, 401 sans token, plus la moyenne et le nombre d'avis.
+
+`FormationApprenantsTest.php` couvre la liste apprenants : 200 propriete, 403 non proprietaire, 200 vide, 401 sans token, 404 formation inconnue.
+
+`MongoActivityLoggerTest.php` couvre les logs MongoDB.
 
 #### Inscription - Laravel (PHPUnit + PCov)
 
-`EnrollmentControllerTest.php` couvre l'inscription/desinscription apprenant, le controle des roles, la formation introuvable.
-
-Test dedie `tests-limite` dans le pipeline CI : verifie qu'un apprenant deja inscrit a 5 formations recoit HTTP 400 a la 6e tentative.
+`EnrollmentControllerTest.php` couvre l'inscription et la desinscription, le controle de role, la limite a 5 inscriptions actives.
 
 #### Commandes locales
 
 ```powershell
 # Auth (Spring Boot)
 cd services/auth
+$env:APP_MASTER_KEY = "dev-master-key-32-chars-minimum-please"
 .\mvnw verify
 
 # Catalog (SQLite pour les tests)
 cd services/catalog
-composer install
-Copy-Item .env.example .env
-php artisan key:generate
-New-Item database/database.sqlite -ItemType File -Force | Out-Null
-$env:DB_CONNECTION="sqlite"
-$env:DB_DATABASE="database/database.sqlite"
-php artisan test --coverage-clover coverage.xml
+$env:DB_CONNECTION = "sqlite"
+$env:DB_DATABASE = ":memory:"
+php artisan test
 
 # Inscription (SQLite pour les tests)
 cd services/inscription
-composer install
-Copy-Item .env.example .env
-php artisan key:generate
-New-Item database/database.sqlite -ItemType File -Force | Out-Null
-$env:DB_CONNECTION="sqlite"
-$env:DB_DATABASE="database/database.sqlite"
-php artisan test --coverage-clover coverage.xml
+$env:DB_CONNECTION = "sqlite"
+$env:DB_DATABASE = ":memory:"
+php artisan test
 ```
 
 - Linting JS/PHP, ESLint cote frontend
@@ -202,7 +204,7 @@ php artisan test --coverage-clover coverage.xml
 ## 4. Structure du depot
 
 ```
-/frontend                # Application React.js (Vite)
+/frontend                # React.js (Vite)
 /services/auth           # Microservice Authentification (Spring Boot / Java 17)
 /services/catalog        # Microservice Catalogue (Laravel)
 /services/inscription    # Microservice Inscriptions (Laravel)
@@ -213,7 +215,7 @@ php artisan test --coverage-clover coverage.xml
 
 Chaque microservice PHP contient :
 
-- `app/`, `routes/`, `database/`, `config/`, `tests/`, `.env`, `composer.json`, etc.
+- `app/`, `routes/`, `database/`, `config/`, `tests/`, `.env`, `composer.json`.
 
 ---
 
@@ -224,17 +226,14 @@ Chaque microservice PHP contient :
 - PHP 8.4 + Composer 2.6+
 - Java JDK 17 (Temurin)
 - Node.js 18+
-- MySQL 8 (ou SQLite pour les tests)
-- MongoDB 7 ( pour les logs d'activite)
+- MySQL 8 (MongoDB 7 pour les logs d'activite)
 
-### Clonage et lancement
+### Lancement
 
 ```powershell
-git clone https://github.com/Andrimirana/Skillhub-BC03.git
-cd Skillhub-BC03
-
 # Auth (Spring Boot)
 cd services/auth
+$env:APP_MASTER_KEY = "dev-master-key-32-chars-minimum-please"
 .\mvnw spring-boot:run
 
 # Catalog (Laravel)
@@ -248,21 +247,21 @@ composer install
 php artisan serve --port=8013
 ```
 
-Le frontend sera accessible sur le port 5183, les microservices sur 8011 (Auth Spring Boot), 8012 (Catalog), 8013 (Inscription).
+Frontend sur 5183, Auth sur 8011, Catalog sur 8012, Inscription sur 8013.
 
-### Initialisation des bases de donnees
+### Initialisation des bases
 
 ```powershell
 cd services/catalog
 php artisan migrate:fresh --seed
 
 cd services/inscription
-php artisan migrate:fresh --seed
+php artisan migrate:fresh
 
-# Auth (Spring Boot) : la base est geree par JPA/Hibernate (ddl-auto=update)
+# Auth : la base MySQL skillhub_auth est geree par JPA (ddl-auto=update)
 ```
 
-### Lancer le frontend en mode dev
+### Frontend en mode dev
 
 ```powershell
 cd frontend
@@ -270,18 +269,20 @@ npm install
 npm run dev
 ```
 
+Voir [GUIDE_DEMARRAGE_LOCAL.md](GUIDE_DEMARRAGE_LOCAL.md) pour le detail et le depannage.
+
 ---
 
 ## 6. Configuration et secrets
 
-Chaque microservice possede son propre fichier `.env` (voir `.env.example` dans chaque dossier).
+Chaque microservice a son propre `.env` (voir `.env.example`).
 
 Variables importantes :
 
-- `APP_KEY`, `APP_MASTER_KEY` (HMAC), `DB_*`, `JWT_SECRET`, etc.
-- Le frontend utilise `VITE_API_URL` pour cibler l'API.
+- `APP_KEY`, `APP_MASTER_KEY`, `DB_*`, `JWT_SECRET`, `AUTH_SERVICE_URL`, `INSCRIPTION_SERVICE_URL`, `CATALOG_SERVICE_URL`.
+- Le frontend utilise `VITE_API_URL`.
 
-Ne jamais versionner les secrets en clair.
+Ne jamais versionner de secrets en clair.
 
 ---
 
@@ -289,12 +290,13 @@ Ne jamais versionner les secrets en clair.
 
 ### Pipeline GitHub Actions
 
-- Lint, tests unitaires, build, analyse SonarCloud a chaque push/PR
+- Lint, tests, build, analyse SonarCloud a chaque push/PR
+- Declenche aussi sur les branches `feature/**` et `fix/**`
 - Quality Gate bloquante
 
 ### SonarCloud
 
-- Analyse de code, duplications, bugs, couverture
+- Analyse code, duplications, bugs, couverture, vulnerabilites, hotspots
 - Organisation et projectKey definis dans `sonar-project.properties`
 
 ---
@@ -302,10 +304,10 @@ Ne jamais versionner les secrets en clair.
 ## 8. Securite et bonnes pratiques
 
 - Authentification JWT, signature HMAC, anti-rejeu
-- Separation stricte des responsabilites (aucun code monolithe)
+- Separation stricte des responsabilites, aucun code partage
 - Variables d'environnement pour tous les secrets
 - Tests unitaires obligatoires
-- Convention de nommage Git (Conventional Commits)
+- Conventional Commits
 
 ---
 
@@ -313,15 +315,15 @@ Ne jamais versionner les secrets en clair.
 
 ### Problemes courants
 
-- Erreur 401 : verifier le token, la session, la synchro des cles JWT/HMAC entre services
-- Connexion refusee entre services : verifier que chaque microservice tourne bien sur son port (Auth 8011, Catalog 8012, Inscription 8013)
-- Pipeline CI/CD echouee : verifier la config SonarCloud, la presence des tests
-- Donnees non affichees : verifier le role, la session, les reponses API
+- Erreur 401 : verifier le token, la session, la coherence des cles JWT/HMAC entre services
+- Connexion refusee entre services : verifier les ports (8011, 8012, 8013)
+- Pipeline CI/CD echouee : verifier la config SonarCloud et la presence des tests
+- Donnees non affichees : verifier le role, la session, la reponse API
 
 ### Commandes utiles
 
 ```powershell
-# Relancer un service Laravel apres modifications
+# Relancer un service Laravel
 cd services/catalog
 php artisan serve --port=8012
 
@@ -339,19 +341,20 @@ php artisan config:clear
 ## 10. Contribution
 
 - Fork, branche thematique, PR vers `dev`, review
-- Respecter le guide `contributing.md`
-- Convention de commit : Conventional Commits (`feat:`, `fix:`, `chore:`, etc.)
+- Respecter `contributing.md`
+- Conventional Commits (`feat:`, `fix:`, `chore:`...)
 - Tests et lint obligatoires avant merge
 
 ---
 
 ## 11. References et documentation
 
-- [PROJECT_CONTEXT.md](PROJECT_CONTEXT.md) - reference projet
 - [RAPPORT_ONBOARDING.md](RAPPORT_ONBOARDING.md) - onboarding junior
+- [RAPPORT_QUALITE.md](RAPPORT_QUALITE.md) - rapport qualite SonarCloud
+- [GUIDE_DEMARRAGE_LOCAL.md](GUIDE_DEMARRAGE_LOCAL.md) - guide demarrage
 - [contributing.md](contributing.md) - guide de contribution
 - [openapi.yaml](openapi.yaml) - contrat des APIs
-- SonarCloud, GitHub Actions
+- JavaDoc HTML : `services/auth/target/site/apidocs/index.html` (genere par `mvn javadoc:javadoc`)
 
 ---
 
@@ -359,23 +362,23 @@ php artisan config:clear
 
 ### Pages React
 
-- `/` (Accueil) : page publique, presentation de la plateforme
-- `/formations` : liste filtrable de toutes les formations disponibles
+- `/` (Accueil) : page publique
+- `/formations` : liste filtrable des formations
 - `/formation/:id` : detail d'une formation
 - `/connexion` : page de connexion
 - `/inscription` : page de creation de compte
 - `/dashboard/formateur` : tableau de bord formateur
 - `/dashboard/apprenant` : tableau de bord apprenant
-- `/creer-atelier` : creation d'une nouvelle formation
+- `/creer-atelier` : creation d'une formation
 - `/modifier-formation/:idFormation` : modification d'une formation
-- `/apprendre/:id` : suivi d'une formation par l'apprenant
+- `/apprendre/:id` : suivi d'une formation
 - `/mes-ateliers` : liste des ateliers de l'utilisateur connecte
 
 ### Routing (React Router)
 
 | Route                     | Acces       | Composant          | Description                                          |
 | ------------------------- | ----------- | ------------------ | ---------------------------------------------------- |
-| `/`                       | Public      | Accueil            | Page d'accueil, presentation                         |
+| `/`                       | Public      | Accueil            | Page d'accueil                                       |
 | `/formations`             | Public      | Formations         | Catalogue filtrable                                  |
 | `/formation/:id`          | Public      | DetailFormation    | Detail formation, bouton inscription                 |
 | `/connexion`              | Invite      | Connexion          | Authentification                                     |
@@ -389,13 +392,7 @@ php artisan config:clear
 | `/dashboard`              | Authentifie | RedirectionAccueil | Redirige selon le role                               |
 | `*`                       | Public      | Redirect           | Redirection vers l'accueil pour route inconnue       |
 
-Les acces sont controles par des guards (RouteProtegee, RouteInvite) selon le role et la session.
+Acces controles par RouteProtegee et RouteInvite selon role et session.
 
-13. Utilisation d'intelligence artificielle
-- ChatGPT: 
-- ChatGPT: 
-- ChatGPT: 
-- ChatGPT: 
-- ChatGPT: 
-- ChatGPT: 
+### 13. Utilisation d'intelligence artificielle
 - ChatGPT: 
