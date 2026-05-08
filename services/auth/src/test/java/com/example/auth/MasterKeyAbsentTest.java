@@ -20,7 +20,7 @@ class MasterKeyAbsentTest {
     void demarrageSansMasterKeyEchoue() {
         MasterKeyService service = new MasterKeyService();
         // Injecter une clé vide (simule APP_MASTER_KEY absente)
-        ReflectionTestUtils.setField(service, "masterKeyRaw", "");
+        ReflectionTestUtils.setField(service, "cleMaitreBrute", "");
         assertThatThrownBy(service::init)
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("APP_MASTER_KEY");
@@ -30,7 +30,7 @@ class MasterKeyAbsentTest {
     @DisplayName("T29 — Démarrage KO si APP_MASTER_KEY null → IllegalStateException")
     void demarrageSansMasterKeyNullEchoue() {
         MasterKeyService service = new MasterKeyService();
-        ReflectionTestUtils.setField(service, "masterKeyRaw", null);
+        ReflectionTestUtils.setField(service, "cleMaitreBrute", null);
         assertThatThrownBy(service::init)
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("APP_MASTER_KEY");
