@@ -30,4 +30,8 @@ Route::middleware('auth.service')->group(function (): void {
     Route::post('/formations/{formation}/modules', [ModuleController::class, 'store']);
     Route::put('/modules/{module}',            [ModuleController::class, 'update']);
     Route::delete('/modules/{module}',         [ModuleController::class, 'destroy']);
+
+    // Liste des apprenants inscrits  réservée au formateur propriétaire de la formation
+    Route::get('/formations/{idFormation}/apprenants', [FormationController::class, 'apprenants'])
+        ->whereNumber('idFormation');
 });

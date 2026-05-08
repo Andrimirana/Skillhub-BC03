@@ -11,4 +11,7 @@ Route::middleware('auth.service')->group(function (): void {
     Route::post('/formations/{formationId}/inscription',    [EnrollmentController::class, 'store']);
     Route::delete('/formations/{formationId}/inscription',  [EnrollmentController::class, 'destroy']);
     Route::get('/apprenant/formations',                     [EnrollmentController::class, 'myCourses']);
+
+    // Inscriptions d'une formation (appelé par catalog pour la vue formateur)
+    Route::get('/formations/{formationId}/inscriptions',    [EnrollmentController::class, 'listForFormation']);
 });
