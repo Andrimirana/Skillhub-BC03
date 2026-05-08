@@ -39,7 +39,12 @@ import java.util.Map;
  *   <li>{@code FENETRE_TIMESTAMP_S = 60} — tolérance fenêtre timestamp</li>
  *   <li>{@code DUREE_VIE_NONCE_S = 120} — durée de vie d'un nonce</li>
  * </ul>
+ *
+ * @author  Elève - TP 1 à 5 : Authentification sécurisée
+ * @version 1.0
  */
+// @Service : marque la classe comme bean Spring de la couche service (logique métier).
+//            Spring l'instancie en singleton et l'injecte dans les contrôleurs qui en dépendent.
 @Service
 public class AuthService {
 
@@ -64,6 +69,16 @@ public class AuthService {
     private final TokenService            serviceJeton;
     private final PasswordPolicyValidator validateurMotDePasse;
 
+    /**
+     * Constructeur — injection de dépendance par Spring (constructor injection).
+     *
+     * @param depotUtilisateurs    accès JPA aux utilisateurs
+     * @param depotNonces          accès JPA aux nonces anti-rejeu
+     * @param serviceCleMaitre     service AES-256-GCM pour chiffrement/déchiffrement
+     * @param serviceHmac          service de calcul/comparaison HMAC-SHA256
+     * @param serviceJeton         service d'émission et validation des jetons Bearer/JWT
+     * @param validateurMotDePasse service de validation de la politique de mot de passe
+     */
     public AuthService(UserRepository depotUtilisateurs,
                        AuthNonceRepository depotNonces,
                        MasterKeyService serviceCleMaitre,
@@ -78,9 +93,9 @@ public class AuthService {
         this.validateurMotDePasse = validateurMotDePasse;
     }
 
-    // ════════════════════════════════════════════════════════════════════
+  
     //  INSCRIPTION
-    // ════════════════════════════════════════════════════════════════════
+
 
     /**
      * Inscrit un nouvel utilisateur.
@@ -93,7 +108,16 @@ public class AuthService {
      *   <li>Vérification unicité email</li>
      *   <li>Chiffrement AES-256-GCM + persistance</li>
      * </ol>
+     *
+     * @param email        adresse email du nouvel utilisateur
+     * @param motDePasse   mot de passe en clair (sera chiffré AES-256-GCM)
+     * @param confirmation confirmation du mot de passe
+     * @return une Map contenant {message, email}
+     * @throws InvalidInputException     si l'email ou le mot de passe est invalide
+     * @throws ResourceConflictException si l'email est déjà utilisé
      */
+    // @Transactional : encapsule la méthode dans une transaction JPA.
+    //                  Tout est rollbacké automatiquement si une exception est levée.
     @Transactional
     public Map<String, String> register(String email, String motDePasse, String confirmation) {
         // Validation email
@@ -124,13 +148,31 @@ public class AuthService {
         return Map.of("message", "Inscription réussie", "email", email);
     }
 
-    // ════════════════════════════════════════════════════════════════════
     //  CONNEXION HMAC-SHA256
-    // ════════════════════════════════════════════════════════════════════
+  
 
     /**
      * Authentifie un utilisateur via le protocole HMAC-SHA256.
+     *
+     * <p>Étapes :</p>
+     * <ol>
+     *   <li>Validation email non vide</li>
+     *   <li>Vérification existence en base</li>
+     *   <li>Vérification que le compte n'est pas verrouillé</li>
+     *   <li>Vérification timestamp dans la fenêtre ±60 secondes</li>
+     *   <li>Vérification nonce non utilisé (anti-rejeu)</li>
+     *   <li>Recalcul HMAC + comparaison en temps constant</li>
+     *   <li>En cas de succès : émission du jeton UUID + JWT</li>
+     * </ol>
+     *
+     * @param requete corps de la requête {email, nonce, timestamp, hmac}
+     * @return la réponse contenant le token UUID, le JWT et la date d'expiration
+     * @throws InvalidInputException         si l'email est vide
+     * @throws AuthenticationFailedException en cas d'échec d'authentification ou de compte verrouillé
      */
+    // @Transactional(noRollbackFor=...) : on garde la transaction sur les écritures
+    // (incrément du compteur d'échecs, persistance du nonce) MÊME en cas d'exception,
+    // sinon les compteurs anti brute-force seraient annulés à chaque tentative invalide.
     @Transactional(noRollbackFor = RuntimeException.class)
     public LoginResponse login(LoginRequest requete) {
         // 1. Email non vide
@@ -199,13 +241,31 @@ public class AuthService {
         return new LoginResponse(jeton.getToken(), jwt, jeton.getExpiresAt());
     }
 
-    // ════════════════════════════════════════════════════════════════════
+
+
+
     //  CHANGEMENT DE MOT DE PASSE
-    // ════════════════════════════════════════════════════════════════════
+
 
     /**
      * Change le mot de passe d'un utilisateur authentifié.
+     *
+     * <p>Étapes :</p>
+     * <ol>
+     *   <li>Validation du jeton — JWT (stateless, signature HS256) ou UUID opaque (lookup DB)</li>
+     *   <li>Vérification de l'ancien mot de passe (déchiffrement AES-GCM puis comparaison)</li>
+     *   <li>Vérification correspondance newPassword / confirmPassword</li>
+     *   <li>Validation politique de sécurité (longueur, casse, chiffres, spéciaux)</li>
+     *   <li>Chiffrement AES-256-GCM du nouveau mot de passe et persistance</li>
+     * </ol>
+     *
+     * @param valeurJeton jeton Bearer reçu (JWT ou UUID)
+     * @param requete     corps de la requête {oldPassword, newPassword, confirmPassword}
+     * @throws AuthenticationFailedException si le jeton est invalide ou si l'ancien mot de passe est incorrect
+     * @throws InvalidInputException         si le nouveau mot de passe ne respecte pas la politique
+     *                                       ou ne correspond pas à sa confirmation
      */
+    // @Transactional : la mise à jour du mot de passe est encapsulée dans une transaction.
     @Transactional
     public void changePassword(String valeurJeton, ChangePasswordRequest requete) {
         // 1. Validation jeton — JWT (stateless) ou opaque UUID (lookup en base)
@@ -247,12 +307,16 @@ public class AuthService {
         journal.info("Mot de passe changé avec succès : {}", utilisateur.getEmail());
     }
 
-    // ════════════════════════════════════════════════════════════════════
+   
     //  UTILITAIRES
-    // ════════════════════════════════════════════════════════════════════
+   
 
     /**
-     * Récupère l'utilisateur associé à un jeton Bearer valide.
+     * Récupère l'utilisateur associé à un jeton Bearer valide (délégation à TokenService).
+     *
+     * @param valeurJeton jeton UUID Bearer
+     * @return l'utilisateur propriétaire du jeton
+     * @throws AuthenticationFailedException si le jeton est inconnu ou expiré
      */
     public User getUserByToken(String valeurJeton) {
         return serviceJeton.getUserByToken(valeurJeton);
@@ -260,18 +324,30 @@ public class AuthService {
 
     /**
      * Évalue la force d'un mot de passe sans le stocker.
+     *
+     * @param motDePasse mot de passe en clair à évaluer
+     * @return {@code "WEAK"}, {@code "MEDIUM"} ou {@code "STRONG"}
      */
     public String evaluatePasswordStrength(String motDePasse) {
         return validateurMotDePasse.evaluateStrength(motDePasse);
     }
 
-    // ════════════════════════════════════════════════════════════════════
+    
     //  EXTENSIONS SKILLHUB
-    // ════════════════════════════════════════════════════════════════════
 
     /**
      * Inscrit un utilisateur avec nom et rôle (Skillhub) et retourne un jeton Bearer.
+     *
+     * @param email        adresse email du nouvel utilisateur
+     * @param motDePasse   mot de passe en clair
+     * @param confirmation confirmation du mot de passe
+     * @param nom          nom complet de l'utilisateur
+     * @param role         rôle Skillhub ({@code "formateur"} ou {@code "apprenant"} — défaut : apprenant)
+     * @return le jeton Bearer émis pour le nouvel utilisateur
+     * @throws InvalidInputException     si l'email ou le mot de passe est invalide
+     * @throws ResourceConflictException si l'email est déjà utilisé
      */
+    // @Transactional : tout est rollbacké si une étape échoue (création utilisateur + token).
     @Transactional
     public AccessToken registerSkillhubUser(String email, String motDePasse,
                                             String confirmation,
@@ -305,7 +381,13 @@ public class AuthService {
 
     /**
      * Invalide un jeton Bearer (déconnexion Skillhub).
+     *
+     * <p>Pour un UUID : suppression en base. Pour un JWT : aucune action
+     * (le JWT est stateless et expire naturellement).</p>
+     *
+     * @param valeurJeton jeton Bearer à invalider
      */
+    // @Transactional : la suppression du token en base doit être atomique.
     @Transactional
     public void logout(String valeurJeton) {
         try {
@@ -318,6 +400,9 @@ public class AuthService {
 
     /**
      * Génère un JWT signé pour un utilisateur (délégation vers TokenService).
+     *
+     * @param utilisateur l'utilisateur pour lequel émettre le JWT
+     * @return un JWT HS256 valide 15 minutes
      */
     public String generateJwt(User utilisateur) {
         return serviceJeton.generateJwt(utilisateur);
@@ -325,6 +410,10 @@ public class AuthService {
 
     /**
      * Valide un JWT et retourne les claims utilisateur sous forme de Map.
+     *
+     * @param jwt le JWT à valider
+     * @return une Map contenant {id, nom, email, role}
+     * @throws io.jsonwebtoken.JwtException si la signature est invalide ou le JWT expiré
      */
     public java.util.Map<String, Object> validateJwtClaims(String jwt) {
         return serviceJeton.validateJwtClaims(jwt);
@@ -332,6 +421,8 @@ public class AuthService {
 
     /**
      * Incrémente le compteur d'échecs et verrouille le compte si le seuil est atteint.
+     *
+     * @param utilisateur l'utilisateur dont on incrémente le compteur d'échecs
      */
     private void incrementerTentativesEchouees(User utilisateur) {
         utilisateur.setFailedAttempts(utilisateur.getFailedAttempts() + 1);

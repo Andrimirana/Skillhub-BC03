@@ -26,13 +26,23 @@ import java.util.Map;
  *   "path":      "/api/auth/login"
  * }
  * </pre>
+ *
+ * @author  Équipe SkillHub BC04
+ * @version 1.0
  */
+// @RestControllerAdvice : intercepte les exceptions levées par tout @RestController
+//                         et permet de retourner une réponse JSON normalisée.
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
     /**
      * Gère les erreurs de validation d'entrée (HTTP 400).
+     *
+     * @param erreur  l'exception métier interceptée
+     * @param requete la requête HTTP en cours (pour récupérer le chemin)
+     * @return HTTP 400 Bad Request avec le corps JSON standardisé
      */
+    // @ExceptionHandler : Spring route ici toute InvalidInputException levée par les contrôleurs.
     @ExceptionHandler(InvalidInputException.class)
     public ResponseEntity<Map<String, Object>> handleInvalidInput(
             InvalidInputException erreur, HttpServletRequest requete) {
@@ -44,7 +54,12 @@ public class GlobalExceptionHandler {
      *
      * <p>Si le message contient "bloqué", retourne HTTP 429 Too Many Requests
      * pour signaler un compte verrouillé suite à trop de tentatives échouées.</p>
+     *
+     * @param erreur  l'exception métier interceptée
+     * @param requete la requête HTTP en cours
+     * @return HTTP 401 Unauthorized ou HTTP 429 Too Many Requests
      */
+    // @ExceptionHandler : Spring route ici toute AuthenticationFailedException.
     @ExceptionHandler(AuthenticationFailedException.class)
     public ResponseEntity<Map<String, Object>> handleAuthFailed(
             AuthenticationFailedException erreur, HttpServletRequest requete) {
@@ -58,7 +73,12 @@ public class GlobalExceptionHandler {
 
     /**
      * Gère les conflits de ressource (HTTP 409).
+     *
+     * @param erreur  l'exception métier interceptée
+     * @param requete la requête HTTP en cours
+     * @return HTTP 409 Conflict avec le corps JSON standardisé
      */
+    // @ExceptionHandler : Spring route ici toute ResourceConflictException.
     @ExceptionHandler(ResourceConflictException.class)
     public ResponseEntity<Map<String, Object>> handleConflict(
             ResourceConflictException erreur, HttpServletRequest requete) {
@@ -67,6 +87,11 @@ public class GlobalExceptionHandler {
 
     /**
      * Construit la réponse JSON standardisée.
+     *
+     * @param statut  le statut HTTP à retourner
+     * @param message le message d'erreur destiné au client
+     * @param chemin  l'URI de la requête en erreur
+     * @return la réponse JSON {timestamp, status, error, message, path}
      */
     private ResponseEntity<Map<String, Object>> construireReponse(
             HttpStatus statut, String message, String chemin) {

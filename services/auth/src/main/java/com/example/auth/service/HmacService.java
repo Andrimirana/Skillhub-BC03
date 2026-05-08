@@ -23,7 +23,11 @@ import java.util.Base64;
  * <p>La comparaison en temps constant via {@link MessageDigest#isEqual(byte[], byte[])}
  * est essentielle : avec {@link String#equals}, un attaquant pourrait deviner la
  * signature bit par bit en mesurant le temps de réponse.</p>
+ *
+ * @author  Équipe SkillHub BC04
+ * @version 1.0
  */
+// @Service : bean Spring de la couche service — singleton thread-safe injecté dans AuthService.
 @Service
 public class HmacService {
 
@@ -35,6 +39,7 @@ public class HmacService {
      * @param cle      la clé secrète (le mot de passe en clair de l'utilisateur)
      * @param donnees  les données à signer ({@code email:nonce:timestamp})
      * @return la signature encodée en Base64
+     * @throws IllegalStateException si l'algorithme HMAC-SHA256 n'est pas disponible sur la JVM
      */
     public String compute(String cle, String donnees) {
         try {

@@ -33,14 +33,25 @@ import java.util.stream.Collectors;
  *   <li>{@code POST /api/validate-token}  — Validation interne pour catalog et inscription</li>
  *   <li>{@code GET  /api/health}          — Endpoint de santé du service</li>
  * </ul>
+ *
+ * @author  Équipe SkillHub BC04
+ * @version 1.0
  */
+// @RestController : marque la classe comme contrôleur REST (réponses sérialisées en JSON).
 @RestController
+// @RequestMapping : préfixe d'URL commun à tous les endpoints de la classe.
 @RequestMapping("/api")
 public class SkillhubController {
 
     private final AuthService authService;
     private final UserRepository userRepository;
 
+    /**
+     * Constructeur — injection de dépendance par Spring (constructor injection).
+     *
+     * @param authService    service métier d'authentification
+     * @param userRepository accès JPA aux utilisateurs (utilisé par /api/users)
+     */
     public SkillhubController(AuthService authService, UserRepository userRepository) {
         this.authService = authService;
         this.userRepository = userRepository;
@@ -53,7 +64,13 @@ public class SkillhubController {
     /**
      * Inscrit un utilisateur et retourne un JWT Bearer valide.
      * Accepte {nom, email, password, passwordConfirm, role}.
+     *
+     * @param req corps JSON contenant {nom, email, password, passwordConfirm, role}
+     * @return HTTP 201 Created avec {token, tokenType, expiresAt, utilisateur}
+     * @throws com.example.auth.exception.InvalidInputException     si l'email ou le mot de passe est invalide
+     * @throws com.example.auth.exception.ResourceConflictException si l'email existe déjà
      */
+    // @PostMapping : POST /api/register — création d'une nouvelle ressource utilisateur.
     @PostMapping("/register")
     public ResponseEntity<SkillhubAuthResponse> register(
             @RequestBody SkillhubRegisterRequest req) {
@@ -79,7 +96,13 @@ public class SkillhubController {
      * Authentifie via HMAC-SHA256 et retourne un JWT Bearer valide.
      * Le frontend envoie {email, nonce, timestamp, hmac} où
      * hmac = HMAC_SHA256(clé=mot_de_passe, data="email:nonce:timestamp") en Base64.
+     *
+     * @param req corps JSON contenant {email, nonce, timestamp, hmac}
+     * @return HTTP 200 avec {token JWT, tokenType, expiresAt, utilisateur}
+     * @throws com.example.auth.exception.AuthenticationFailedException si HMAC, nonce, timestamp ou compte invalides
+     * @throws com.example.auth.exception.InvalidInputException         si l'email est vide
      */
+    // @PostMapping : POST /api/login (POST = ne pas exposer les credentials dans l'URL).
     @PostMapping("/login")
     public ResponseEntity<SkillhubAuthResponse> login(
             @RequestBody LoginRequest req) {
@@ -102,7 +125,11 @@ public class SkillhubController {
     /**
      * Retourne les informations de l'utilisateur authentifié.
      * Accepte un JWT (frontend Skillhub) ou un UUID (endpoints legacy /api/auth/*).
+     *
+     * @param authHeader header HTTP {@code Authorization: Bearer <token>}
+     * @return HTTP 200 avec les claims utilisateur, ou HTTP 401 si token invalide
      */
+    // @GetMapping : GET /api/profil — lecture du profil sans modification d'état.
     @GetMapping("/profil")
     public ResponseEntity<Map<String, Object>> profil(
             @RequestHeader("Authorization") String authHeader) {
@@ -129,7 +156,11 @@ public class SkillhubController {
     /**
      * Déconnecte l'utilisateur. Pour les UUID : suppression en base.
      * Pour les JWT (stateless) : retourne 200 — le token expire automatiquement.
+     *
+     * @param authHeader header HTTP {@code Authorization: Bearer <token>}
+     * @return HTTP 200 avec un message de confirmation
      */
+    // @PostMapping : POST /api/logout — action qui modifie l'état serveur (suppression du token).
     @PostMapping("/logout")
     public ResponseEntity<Map<String, String>> logout(
             @RequestHeader("Authorization") String authHeader) {
@@ -144,7 +175,17 @@ public class SkillhubController {
 
     /**
      * Alias de PUT /api/auth/change-password accessible depuis le frontend Skillhub.
+     *
+     * <p>Vérifie le token, contrôle l'ancien mot de passe (déchiffrement AES-GCM),
+     * applique la politique de sécurité, puis chiffre et persiste le nouveau mot de passe.</p>
+     *
+     * @param authHeader header HTTP {@code Authorization: Bearer <token>}
+     * @param req        corps JSON contenant {oldPassword, newPassword, confirmPassword}
+     * @return HTTP 200 avec un message de confirmation
+     * @throws com.example.auth.exception.AuthenticationFailedException si le token ou l'ancien mot de passe est invalide
+     * @throws com.example.auth.exception.InvalidInputException         si le nouveau mot de passe ne respecte pas la politique
      */
+    // @PutMapping : PUT /api/change-password — mise à jour idempotente d'une ressource.
     @PutMapping("/change-password")
     public ResponseEntity<Map<String, String>> changePassword(
             @RequestHeader("Authorization") String authHeader,
@@ -162,7 +203,11 @@ public class SkillhubController {
      * Accepte un JWT signé HS256 (stateless) ou un UUID opaque (lookup DB).
      * Format de réponse attendu par les middlewares PHP de Skillhub :
      * {@code {"valid": true, "user": {"id": 1, "nom": "...", "email": "...", "role": "..."}}}
+     *
+     * @param authHeader header HTTP {@code Authorization: Bearer <token>} (optionnel)
+     * @return HTTP 200 avec {@code {valid: true, user: {...}}}, ou HTTP 401 si invalide
      */
+    // @PostMapping : POST /api/validate-token — endpoint inter-services appelé par catalog/inscription.
     @PostMapping("/validate-token")
     public ResponseEntity<Map<String, Object>> validateToken(
             @RequestHeader(value = "Authorization", required = false) String authHeader) {
@@ -195,7 +240,11 @@ public class SkillhubController {
      * Retourne la liste de tous les utilisateurs (id, nom, email).
      * Utilisé par le service audio pour la sélection de destinataires.
      * Nécessite un token valide.
+     *
+     * @param authHeader header HTTP {@code Authorization: Bearer <token>}
+     * @return HTTP 200 avec {@code {utilisateurs: [...]}}, ou HTTP 401 si non autorisé
      */
+    // @GetMapping : GET /api/users — lecture seule de la liste des utilisateurs.
     @GetMapping("/users")
     public ResponseEntity<?> listUsers(
             @RequestHeader("Authorization") String authHeader) {
@@ -225,7 +274,12 @@ public class SkillhubController {
     //  HEALTH CHECK
     // ════════════════════════════════════════════════════════════════════
 
-    /** Endpoint de santé du service. */
+    /**
+     * Endpoint de santé du service.
+     *
+     * @return HTTP 200 avec {@code {"status": "UP"}}
+     */
+    // @GetMapping : GET /api/health — sondé par les load balancers / monitoring.
     @GetMapping("/health")
     public ResponseEntity<Map<String, String>> health() {
         // Endpoint simple qui répond UP si le service répond.
@@ -236,6 +290,12 @@ public class SkillhubController {
     //  MÉTHODES PRIVÉES
     // ════════════════════════════════════════════════════════════════════
 
+    /**
+     * Extrait la valeur du jeton depuis le header Authorization.
+     *
+     * @param authHeader valeur brute du header (ex : {@code "Bearer abc123"})
+     * @return le jeton seul, ou la valeur telle quelle si le préfixe est absent
+     */
     private String extractToken(String authHeader) {
         if (authHeader != null && authHeader.startsWith("Bearer ")) {
             return authHeader.substring(7);
@@ -243,6 +303,12 @@ public class SkillhubController {
         return authHeader;
     }
 
+    /**
+     * Construit le DTO public {@link UtilisateurInfo} à partir d'une entité User.
+     *
+     * @param user l'entité utilisateur en base
+     * @return DTO contenant {id, nom, email, role}
+     */
     private UtilisateurInfo toUtilisateurInfo(User user) {
         // On construit le DTO public à partir de l'entité User.
         // Si le nom est vide, on utilise l'email à la place.
@@ -255,6 +321,13 @@ public class SkillhubController {
         );
     }
 
+    /**
+     * Variante de {@link #toUtilisateurInfo} retournant une {@code Map} (format
+     * attendu par les middlewares Laravel de catalog/inscription).
+     *
+     * @param user l'entité utilisateur en base
+     * @return une Map contenant {id, nom, email, role}
+     */
     private Map<String, Object> toUserMap(User user) {
         // Même logique que toUtilisateurInfo mais sous forme de Map.
         return Map.of(
