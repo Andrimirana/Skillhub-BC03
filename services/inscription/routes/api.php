@@ -11,4 +11,7 @@ Route::middleware('auth.service')->group(function (): void {
     Route::post('/formations/{formationId}/inscription',    [EnrollmentController::class, 'store']);
     Route::delete('/formations/{formationId}/inscription',  [EnrollmentController::class, 'destroy']);
     Route::get('/apprenant/formations',                     [EnrollmentController::class, 'myCourses']);
+
+    // Vérification d'inscription appelée par le service Catalog (notation des formations)
+    Route::get('/inscriptions/verifier/{formationId}',      [EnrollmentController::class, 'verifier']);
 });

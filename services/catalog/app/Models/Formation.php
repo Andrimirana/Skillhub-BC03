@@ -38,4 +38,9 @@ class Formation extends Model
     {
         return $this->hasMany(Module::class, 'formation_id')->orderBy('ordre');
     }
+
+    public function ratings(): HasMany
+    {
+        return $this->hasMany(Rating::class, 'formation_id');
+    }
 }

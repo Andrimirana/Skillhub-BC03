@@ -3,6 +3,7 @@
 use App\Http\Controllers\ActivityLogController;
 use App\Http\Controllers\FormationController;
 use App\Http\Controllers\ModuleController;
+use App\Http\Controllers\RatingController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -30,4 +31,8 @@ Route::middleware('auth.service')->group(function (): void {
     Route::post('/formations/{formation}/modules', [ModuleController::class, 'store']);
     Route::put('/modules/{module}',            [ModuleController::class, 'update']);
     Route::delete('/modules/{module}',         [ModuleController::class, 'destroy']);
+
+    // Notation des formations  un apprenant inscrit peut noter (1 à 5) une seule fois
+    Route::post('/formations/{idFormation}/noter', [RatingController::class, 'store'])
+        ->whereNumber('idFormation');
 });

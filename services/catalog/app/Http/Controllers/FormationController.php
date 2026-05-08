@@ -84,9 +84,17 @@ class FormationController extends Controller
 
         $this->mongoLogger->log('course_viewed', ['course_id' => $formation->id]);
 
+        // Notation : moyenne arrondie à 0.1 et nombre total d'avis
+        $nbreAvis    = $formation->ratings()->count();
+        $noteMoyenne = $nbreAvis > 0
+            ? round((float) $formation->ratings()->avg('note'), 1)
+            : null;
+
         return response()->json([
             ...$this->presenterFormation($formation, false),
-            'modules' => $formation->modules->map(fn ($m) => [
+            'note_moyenne' => $noteMoyenne,
+            'nbre_avis'    => $nbreAvis,
+            'modules'      => $formation->modules->map(fn ($m) => [
                 'id'      => $m->id,
                 'titre'   => $m->titre,
                 'contenu' => $m->contenu,
