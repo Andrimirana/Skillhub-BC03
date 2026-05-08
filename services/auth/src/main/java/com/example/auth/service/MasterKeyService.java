@@ -20,7 +20,11 @@ import java.util.Base64;
  * Si la clé est absente au démarrage, l'application refuse de démarrer.</p>
  *
  * <p>Format de stockage en base : {@code v1:Base64(iv):Base64(ciphertext)}</p>
+ *
+ * @author  Équipe SkillHub BC04
+ * @version 1.0
  */
+// @Service : bean Spring de la couche service — singleton, instancié une fois au démarrage.
 @Service
 public class MasterKeyService {
 
@@ -40,7 +44,11 @@ public class MasterKeyService {
     /**
      * Initialise la clé secrète au démarrage.
      * L'application refuse de démarrer si {@code APP_MASTER_KEY} est absente.
+     *
+     * @throws IllegalStateException si la clé maître est absente, vide ou si SHA-256 indisponible
      */
+    // @PostConstruct : Spring appelle cette méthode après l'injection des dépendances,
+    //                  une seule fois lors du démarrage du bean.
     @PostConstruct
     public void init() {
         // Sans clé maître, l'application refuse de démarrer.
@@ -61,6 +69,10 @@ public class MasterKeyService {
 
     /**
      * Chiffre un mot de passe en clair avec AES-256-GCM.
+     *
+     * @param enClair le mot de passe en clair à chiffrer
+     * @return la chaîne chiffrée au format {@code v1:Base64(iv):Base64(ciphertext)}
+     * @throws IllegalStateException en cas d'erreur cryptographique (algorithme indisponible, clé invalide…)
      */
     public String encrypt(String enClair) {
         try {
@@ -86,6 +98,10 @@ public class MasterKeyService {
 
     /**
      * Déchiffre un mot de passe chiffré AES-256-GCM.
+     *
+     * @param chiffre la chaîne chiffrée au format {@code v1:Base64(iv):Base64(ciphertext)}
+     * @return le mot de passe en clair
+     * @throws IllegalStateException si le format est invalide ou si le tag GCM est altéré
      */
     public String decrypt(String chiffre) {
         try {

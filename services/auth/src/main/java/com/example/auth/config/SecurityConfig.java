@@ -24,14 +24,25 @@ import java.util.List;
  *
  * <p>CORS configuré pour autoriser les appels depuis le frontend React
  * (toute origine acceptée en développement).</p>
+ *
+ * @author  Équipe SkillHub BC04
+ * @version 1.0
  */
+// @Configuration : déclare cette classe comme source de beans Spring
+//                  (les méthodes annotées @Bean produisent des objets gérés par Spring).
 @Configuration
+// @EnableWebSecurity : active la configuration de Spring Security pour l'application.
 @EnableWebSecurity
 public class SecurityConfig {
 
     /**
      * Chaîne de filtres de sécurité.
+     *
+     * @param http builder Spring Security injecté par Spring
+     * @return la chaîne de filtres construite
+     * @throws Exception si la configuration Spring Security échoue
      */
+    // @Bean : la valeur retournée devient un bean Spring nommé "filterChain".
     @Bean
     @SuppressWarnings("java:S4502")
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
@@ -60,7 +71,10 @@ public class SecurityConfig {
     /**
      * Configuration CORS — autorise le frontend React (toute origine, tous headers).
      * Intentionnel en développement : API stateless Bearer token, CORS inoffensif sans credentials.
+     *
+     * @return la source de configuration CORS appliquée à toutes les routes
      */
+    // @Bean : la source CORS est exposée comme bean Spring et utilisée par filterChain().
     @Bean
     @SuppressWarnings("java:S5122")
     public CorsConfigurationSource corsConfigurationSource() {
@@ -80,8 +94,11 @@ public class SecurityConfig {
     }
 
     /**
-     * Encodeur BCrypt.
+     * Encodeur BCrypt — utilisable comme bean si un endpoint a besoin de hasher un mot de passe.
+     *
+     * @return un encodeur BCrypt prêt à l'emploi
      */
+    // @Bean : Spring expose ce BCryptPasswordEncoder comme singleton injectable partout.
     @Bean
     public PasswordEncoder passwordEncoder() {
         // Bean Spring : disponible si on a besoin d'un encodeur BCrypt ailleurs.

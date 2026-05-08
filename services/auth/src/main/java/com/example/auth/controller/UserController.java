@@ -17,13 +17,23 @@ import java.util.Map;
  *
  * <p> Cette implémentation est pédagogique. Ne jamais utiliser en production
  * sans audit de sécurité complet.</p>
+ *
+ * @author  Équipe SkillHub BC04
+ * @version 1.0
  */
+// @RestController : marque la classe comme contrôleur REST (réponses sérialisées en JSON).
 @RestController
+// @RequestMapping : préfixe d'URL appliqué à toutes les méthodes ci-dessous.
 @RequestMapping("/api")
 public class UserController {
 
     private final AuthService serviceAuth;
 
+    /**
+     * Constructeur — injection de dépendance par Spring.
+     *
+     * @param serviceAuth service métier d'authentification injecté par Spring
+     */
     public UserController(AuthService serviceAuth) {
         this.serviceAuth = serviceAuth;
     }
@@ -32,7 +42,12 @@ public class UserController {
      * Retourne les informations de l'utilisateur authentifié.
      *
      * <p>Requiert un header {@code Authorization: Bearer <token>} valide.</p>
+     *
+     * @param enteteAuth header HTTP {@code Authorization: Bearer <token>}
+     * @return HTTP 200 avec {email, id, createdAt}
+     * @throws com.example.auth.exception.AuthenticationFailedException si le token est invalide ou expiré
      */
+    // @GetMapping = mappe HTTP GET /api/me vers cette méthode.
     @GetMapping("/me")
     public ResponseEntity<Map<String, Object>> getMe(
             @RequestHeader("Authorization") String enteteAuth) {
@@ -50,6 +65,9 @@ public class UserController {
 
     /**
      * Extrait la valeur du jeton depuis le header Authorization.
+     *
+     * @param enteteAuth valeur brute du header (ex : {@code "Bearer abc123"})
+     * @return le jeton seul, ou la valeur telle quelle si le préfixe est absent
      */
     private String extraireJetonBearer(String enteteAuth) {
         // On enlève le préfixe "Bearer " pour ne garder que le jeton.

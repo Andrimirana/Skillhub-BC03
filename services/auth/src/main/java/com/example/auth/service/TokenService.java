@@ -26,7 +26,11 @@ import java.util.UUID;
  * lors des accès aux endpoints protégés.</p>
  *
  * <p>Chaque jeton est valide pendant {@value #DUREE_VALIDITE_MIN} minutes.</p>
+ *
+ * @author  Équipe SkillHub BC04
+ * @version 1.0
  */
+// @Service : bean Spring de la couche service, injecté dans AuthService.
 @Service
 public class TokenService {
 
@@ -40,6 +44,11 @@ public class TokenService {
 
     private final AccessTokenRepository depotJetons;
 
+    /**
+     * Constructeur — injection de dépendance par Spring.
+     *
+     * @param depotJetons accès JPA aux jetons d'accès persistés
+     */
     public TokenService(AccessTokenRepository depotJetons) {
         this.depotJetons = depotJetons;
     }
@@ -47,7 +56,11 @@ public class TokenService {
     /**
      * Génère un nouveau jeton Bearer pour un utilisateur authentifié.
      * Le jeton est persisté en base de données.
+     *
+     * @param utilisateur l'utilisateur propriétaire du jeton
+     * @return l'entité {@link AccessToken} persistée (UUID + date d'expiration à +15 min)
      */
+    // @Transactional : la création + persistance du jeton est encapsulée dans une transaction.
     @Transactional
     public AccessToken generate(User utilisateur) {
         // On génère un identifiant unique (UUID) qui servira de jeton.
@@ -62,6 +75,9 @@ public class TokenService {
     /**
      * Génère un JWT signé HS256 contenant les claims nécessaires aux middlewares Laravel.
      * Claims embarqués : sub (email), userId, nom, role — valides 15 minutes.
+     *
+     * @param utilisateur l'utilisateur pour lequel émettre le JWT
+     * @return un JWT compact (3 segments base64url séparés par des points)
      */
     public String generateJwt(User utilisateur) {
         // Date courante et date d'expiration (now + 15 minutes).
@@ -83,6 +99,10 @@ public class TokenService {
     /**
      * Valide la signature d'un JWT et retourne les claims utilisateur.
      * Utilisé par {@code POST /api/validate-token} pour les appels inter-services.
+     *
+     * @param jwt le JWT compact à valider
+     * @return une Map contenant {id, nom, email, role}
+     * @throws io.jsonwebtoken.JwtException si la signature est invalide ou le JWT expiré
      */
     public java.util.Map<String, Object> validateJwtClaims(String jwt) {
         // On vérifie la signature et on extrait les claims (le contenu du JWT).
@@ -104,6 +124,9 @@ public class TokenService {
     /**
      * Dérive une clé HMAC-SHA256 de 256 bits depuis le secret JWT via SHA-256.
      * Garantit une clé valide quelle que soit la longueur du secret configuré.
+     *
+     * @return une clé HMAC adaptée à l'algorithme HS256
+     * @throws IllegalStateException si SHA-256 n'est pas disponible sur la JVM
      */
     private Key getSigningKey() {
         try {
@@ -119,7 +142,12 @@ public class TokenService {
 
     /**
      * Recherche l'utilisateur associé à un jeton Bearer valide.
+     *
+     * @param valeurJeton la valeur UUID du jeton Bearer
+     * @return l'utilisateur propriétaire du jeton
+     * @throws AuthenticationFailedException si le jeton est inconnu ou expiré
      */
+    // @Transactional(readOnly = true) : transaction en lecture seule (optimisation JPA, pas de flush).
     @Transactional(readOnly = true)
     public User getUserByToken(String valeurJeton) {
         // On cherche le jeton en base. S'il n'existe pas, c'est un 401.
@@ -137,7 +165,10 @@ public class TokenService {
 
     /**
      * Supprime un jeton de la base de données (déconnexion).
+     *
+     * @param valeurJeton la valeur UUID du jeton à invalider
      */
+    // @Transactional : la suppression doit être atomique.
     @Transactional
     public void deleteToken(String valeurJeton) {
         depotJetons.deleteByToken(valeurJeton);

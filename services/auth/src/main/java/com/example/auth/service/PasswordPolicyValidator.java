@@ -19,7 +19,11 @@ import java.util.regex.Pattern;
  *
  * <p>Les patterns regex sont pré-compilés en constantes statiques pour éviter
  * les recompilations à chaque appel et se protéger contre les attaques ReDoS.</p>
+ *
+ * @author  Équipe SkillHub BC04
+ * @version 1.0
  */
+// @Service : bean Spring, singleton thread-safe injecté dans AuthService.
 @Service
 public class PasswordPolicyValidator {
 
@@ -32,6 +36,9 @@ public class PasswordPolicyValidator {
     /**
      * Valide un mot de passe selon la politique de sécurité.
      * Lève une {@link InvalidInputException} si une règle n'est pas respectée.
+     *
+     * @param motDePasse le mot de passe en clair à valider
+     * @throws InvalidInputException si une règle de la politique n'est pas respectée
      */
     public void validate(String motDePasse) {
         // 1. Le mot de passe doit exister.
@@ -74,6 +81,9 @@ public class PasswordPolicyValidator {
      *   <li>{@code MEDIUM} : 3 critères satisfaits</li>
      *   <li>{@code STRONG} : ≥ 4 critères ET longueur ≥ 16</li>
      * </ul>
+     *
+     * @param motDePasse le mot de passe en clair à évaluer
+     * @return {@code "WEAK"}, {@code "MEDIUM"} ou {@code "STRONG"}
      */
     public String evaluateStrength(String motDePasse) {
         // Mot de passe absent ou trop court : faible.
