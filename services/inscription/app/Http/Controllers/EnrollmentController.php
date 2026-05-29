@@ -58,6 +58,20 @@ class EnrollmentController extends Controller
         ], 201);
     }
 
+    public function verifier(Request $requete, int $idFormation): JsonResponse
+    {
+        // Endpoint inter-services léger : permet à catalog de vérifier
+        // qu'un apprenant est bien inscrit à la formation avant de noter.
+        $utilisateurAuth = $requete->input('auth_user');
+
+        $estInscrit = Enrollment::query()
+            ->where('utilisateur_id', $utilisateurAuth['id'])
+            ->where('formation_id', $idFormation)
+            ->exists();
+
+        return response()->json(['inscrit' => $estInscrit]);
+    }
+
     public function destroy(Request $requete, int $idFormation): JsonResponse
     {
         $utilisateurAuth = $requete->input('auth_user');
