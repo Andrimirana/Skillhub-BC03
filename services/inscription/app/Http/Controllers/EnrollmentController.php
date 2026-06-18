@@ -58,6 +58,24 @@ class EnrollmentController extends Controller
         ], 201);
     }
 
+    public function listForFormation(Request $requete, int $idFormation): JsonResponse
+    {
+        // Endpoint inter-services léger : retourne les inscriptions d'une formation
+        // (id apprenant, progression, date d'inscription) — utilisé par catalog
+        // pour afficher la liste des apprenants côté formateur propriétaire.
+        $inscriptions = Enrollment::query()
+            ->where('formation_id', $idFormation)
+            ->orderByDesc('date_inscription')
+            ->get()
+            ->map(fn (Enrollment $i) => [
+                'utilisateur_id'   => $i->utilisateur_id,
+                'progression'      => $i->progression,
+                'date_inscription' => optional($i->date_inscription)->toIso8601String(),
+            ]);
+
+        return response()->json($inscriptions);
+    }
+
     public function destroy(Request $requete, int $idFormation): JsonResponse
     {
         $utilisateurAuth = $requete->input('auth_user');

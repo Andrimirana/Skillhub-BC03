@@ -13,6 +13,7 @@ use App\Models\Module;
 use App\Services\MongoActivityLogger;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Http;
 
 class FormationController extends Controller
 {
@@ -165,6 +166,69 @@ class FormationController extends Controller
         }
 
         return response()->json($this->presenterFormation($formation, true));
+    }
+
+    public function apprenants(Request $requete, int $idFormation): JsonResponse
+    {
+        $utilisateurAuth = $requete->input('auth_user');
+
+        // Seul un formateur peut consulter la liste des apprenants
+        if (($utilisateurAuth['role'] ?? '') !== 'formateur') {
+            return response()->json(['message' => 'Seuls les formateurs peuvent consulter la liste des apprenants.'], 403);
+        }
+
+        // La formation doit exister
+        $formation = Formation::query()->find($idFormation);
+        if ($formation === null) {
+            return response()->json(['message' => 'Formation introuvable.'], 404);
+        }
+
+        // Le formateur doit être propriétaire de la formation
+        if ((int) $formation->user_id !== (int) $utilisateurAuth['id']) {
+            return response()->json(['message' => 'Cette formation ne vous appartient pas.'], 403);
+        }
+
+        $jeton = (string) $requete->bearerToken();
+
+        // Inscriptions de la formation récupérées auprès du service Inscription
+        $urlInscription = rtrim((string) config('services.inscription.url'), '/');
+        $reponseInscriptions = Http::withToken($jeton)
+            ->get(sprintf('%s/api/formations/%d/inscriptions', $urlInscription, $idFormation)); // NOSONAR — appel inter-services interne, URL provient de la configuration
+
+        if (! $reponseInscriptions->ok()) {
+            return response()->json([], 200);
+        }
+
+        $inscriptions = collect($reponseInscriptions->json() ?? []);
+
+        if ($inscriptions->isEmpty()) {
+            return response()->json([]);
+        }
+
+        // Détails utilisateurs (nom, email) récupérés auprès du service Auth
+        $urlAuth = rtrim((string) config('services.auth.url'), '/');
+        $reponseUtilisateurs = Http::withToken($jeton)
+            ->get(sprintf('%s/api/users', $urlAuth)); // NOSONAR — appel inter-services interne, URL provient de la configuration
+
+        $utilisateurs = collect();
+        if ($reponseUtilisateurs->ok()) {
+            $utilisateurs = collect($reponseUtilisateurs->json('utilisateurs') ?? [])
+                ->keyBy('id');
+        }
+
+        $apprenants = $inscriptions->map(function (array $inscription) use ($utilisateurs): array {
+            $utilisateur = $utilisateurs->get($inscription['utilisateur_id'], []);
+
+            return [
+                'id'               => $inscription['utilisateur_id'],
+                'nom'              => $utilisateur['nom']   ?? 'Utilisateur inconnu',
+                'email'            => $utilisateur['email'] ?? null,
+                'progression'      => $inscription['progression'] ?? 0,
+                'date_inscription' => $inscription['date_inscription'] ?? null,
+            ];
+        });
+
+        return response()->json($apprenants->values());
     }
 
     public function destroy(Request $requete, Formation $formation): JsonResponse

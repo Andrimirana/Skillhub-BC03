@@ -39,4 +39,8 @@ return [
         'url' => env('AUTH_SERVICE_URL', 'http://localhost:8001'),
     ],
 
+    'inscription' => [
+        'url' => env('INSCRIPTION_SERVICE_URL', 'http://localhost:8013'),
+    ],
+
 ];
